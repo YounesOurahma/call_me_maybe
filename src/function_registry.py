@@ -22,11 +22,8 @@ class FunctionRegistry:
         - Which function was selected?
     """
 
-    def __init__(
-        self,
-        functions: Iterable[FunctionDefinition],
-        model: Small_LLM_Model,
-    ) -> None:
+    def __init__(self, functions: Iterable[FunctionDefinition],
+                 model: Small_LLM_Model) -> None:
 
         self._trie: TokenTrie[FunctionDefinition] = TokenTrie()
 
@@ -41,36 +38,23 @@ class FunctionRegistry:
                 function,
             )
 
-    def allowed_next_tokens(
-        self,
-        generated: list[int],
-    ) -> set[int]:
+    def allowed_next_tokens(self, generated: list[int]) -> set[int]:
         """
         Return every token that may legally follow the
         generated sequence.
         """
 
-        return self._trie.allowed_next_tokens(
-            tuple(generated)
-        )
+        return self._trie.allowed_next_tokens(tuple(generated))
 
-    def is_complete(
-        self,
-        generated: list[int],
-    ) -> bool:
+    def is_complete(self, generated: list[int]) -> bool:
         """
         Return True iff the generated sequence exactly
         matches one registered function.
         """
 
-        return self._trie.contains(
-            tuple(generated)
-        )
+        return self._trie.contains(tuple(generated))
 
-    def selected_function(
-        self,
-        generated: list[int],
-    ) -> FunctionDefinition:
+    def selected_function(self, generated: list[int]) -> FunctionDefinition:
         """
         Return the FunctionDefinition corresponding to the
         generated token sequence.
@@ -82,6 +66,4 @@ class FunctionRegistry:
             registered function.
         """
 
-        return self._trie.get(
-            tuple(generated)
-        )
+        return self._trie.get(tuple(generated))

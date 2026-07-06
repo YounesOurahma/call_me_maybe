@@ -28,14 +28,7 @@ class TokenTrie(Generic[T]):
     def __init__(self) -> None:
         self._root: TrieNode[T] = TrieNode()
 
-    # ==========================================================
-    # Internal helpers
-    # ==========================================================
-
-    def _follow(
-        self,
-        sequence: tuple[int, ...],
-    ) -> Optional[TrieNode[T]]:
+    def _follow(self, sequence: tuple[int, ...]) -> Optional[TrieNode[T]]:
         """
         Follow a sequence inside the trie.
 
@@ -56,15 +49,7 @@ class TokenTrie(Generic[T]):
 
         return node
 
-    # ==========================================================
-    # Public API
-    # ==========================================================
-
-    def insert(
-        self,
-        sequence: tuple[int, ...],
-        value: T,
-    ) -> None:
+    def insert(self, sequence: tuple[int, ...], value: T) -> None:
         """
         Insert a token sequence together with its associated value.
         """
@@ -84,10 +69,7 @@ class TokenTrie(Generic[T]):
         node.terminal = True
         node.value = value
 
-    def allowed_next_tokens(
-        self,
-        sequence: tuple[int, ...],
-    ) -> set[int]:
+    def allowed_next_tokens(self, sequence: tuple[int, ...]) -> set[int]:
         """
         Return every valid next token after the given sequence.
         """
@@ -99,10 +81,7 @@ class TokenTrie(Generic[T]):
 
         return set(node.children.keys())
 
-    def contains(
-        self,
-        sequence: tuple[int, ...],
-    ) -> bool:
+    def contains(self, sequence: tuple[int, ...]) -> bool:
         """
         Return True if the sequence is a complete entry.
         """
@@ -111,10 +90,7 @@ class TokenTrie(Generic[T]):
 
         return node is not None and node.terminal
 
-    def get(
-        self,
-        sequence: tuple[int, ...],
-    ) -> T:
+    def get(self, sequence: tuple[int, ...]) -> T:
         """
         Return the object associated with a complete sequence.
 
