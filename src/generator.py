@@ -4,6 +4,7 @@ import numpy as np
 from llm_sdk import Small_LLM_Model
 from .decoder import Decoder
 from .models import FunctionDefinition
+from .function_registry import FunctionRegistry
 
 
 class Generator:
@@ -11,9 +12,12 @@ class Generator:
     Generates the function name using constrained decoding.
     """
 
-    def __init__(self, model: Small_LLM_Model, decoder: Decoder) -> None:
+    def __init__(self, model: Small_LLM_Model, decoder: Decoder,
+                 registry: FunctionRegistry) -> None:
+
         self._model = model
         self._decoder = decoder
+        self._registry = registry
 
     def generate(self, prompt: str) -> FunctionDefinition:
         """
@@ -53,11 +57,49 @@ class Generator:
 
         return self._decoder.selected_function(generated)
 
-    def _encode_prompt(self, prompt: str) -> List[int]:
+    def _build_prompt(self, prompt: str) -> str:
         """
-        Convert the prompt into a list of token ids.
+        Build the prompt sent to the language model.
         """
 
-        encoded = self._model.encode(prompt)
+        lines: list[str] = []
+
+        lines.append(
+            "Select the best matching function for the user request."
+        )
+        lines.append("")
+        lines.append("Available functions:")
+        lines.append("")
+
+        for function in self._registry.functions:
+
+            lines.append(function.name)
+            lines.append(f"Description: {function.description}")
+
+            if function.parameters:
+                lines.append("Parameters:")
+
+                for name, parameter in function.parameters.items():
+                    lines.append(
+                        f"- {name}: {parameter.type}"
+                    )
+
+            lines.append("")
+
+        lines.append("User request:")
+        lines.append(prompt)
+        lines.append("")
+        lines.append("Selected function:")
+
+        return "\n".join(lines)
+
+    def _encode_prompt(self, prompt: str) -> list[int]:
+        """
+        Encode the complete prompt.
+        """
+
+        full_prompt = self._build_prompt(prompt)
+
+        encoded = self._model.encode(full_prompt)
 
         return encoded.squeeze(0).tolist()

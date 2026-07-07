@@ -25,6 +25,7 @@ class FunctionRegistry:
     def __init__(self, functions: Iterable[FunctionDefinition],
                  model: Small_LLM_Model) -> None:
 
+        self._functions = list(functions)
         self._trie: TokenTrie[FunctionDefinition] = TokenTrie()
 
         for function in functions:
@@ -67,3 +68,11 @@ class FunctionRegistry:
         """
 
         return self._trie.get(tuple(generated))
+
+    @property
+    def functions(self) -> list[FunctionDefinition]:
+        """
+        Return every registered function.
+        """
+
+        return self._functions
