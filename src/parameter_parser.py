@@ -46,6 +46,9 @@ class ParameterParser:
             If a required parameter cannot be extracted.
         """
 
+        if self._is_regex_replacement_function(function):
+            return self._parse_regex_replacement(prompt)
+
         numbers = deque(self._extract_numbers(prompt))
         strings = deque(
             self._extract_strings(
@@ -229,3 +232,85 @@ class ParameterParser:
             )
 
         return value
+
+    def _is_regex_replacement_function(self,
+                                       function: FunctionDefinition) -> bool:
+        """
+        Detect functions that require a source string,
+        a regex pattern and a replacement.
+        """
+
+        parameters = set(function.parameters.keys())
+
+        required = {
+            "source_string",
+            "regex",
+            "replacement",
+        }
+
+        return required.issubset(parameters)
+
+    def _parse_regex_replacement(self, prompt: str) -> dict[str, str]:
+        """
+        Extract parameters for string replacement functions.
+        """
+
+        result: dict[str, str] = {}
+
+        quoted = self._extract_quoted_strings(prompt)
+
+        lower = prompt.lower()
+
+        # Detect the pattern
+        if "vowel" in lower:
+            result["regex"] = "[aeiouAEIOU]"
+            if "asterisk" in lower:
+                result["replacement"] = "*"
+
+        elif "number" in lower:
+            result["regex"] = r"\d+"
+
+        elif len(quoted) >= 2:
+            result["regex"] = quoted[0]
+
+        else:
+            result["regex"] = ""
+
+        # Detect:
+        # Substitute 'cat' with 'dog' in 'text'
+        if "substitute" in lower and len(quoted) >= 3:
+
+            result["regex"] = quoted[0]
+            result["replacement"] = quoted[1]
+            result["source_string"] = quoted[2]
+
+            return {
+                "source_string": result.get("source_string", ""),
+                "regex": result.get("regex", ""),
+                "replacement": result.get("replacement", ""),
+            }
+
+        # Detect:
+        # Replace ... in "text" with replacement
+
+        if quoted:
+            result["source_string"] = quoted[0]
+
+        words = prompt.split()
+
+        if "with" in words:
+
+            index = words.index("with")
+
+            if index + 1 < len(words):
+                if "replacement" not in result:
+                    result["replacement"] = words[index + 1]
+
+        else:
+            result["replacement"] = ""
+
+        return {
+            "source_string": result.get("source_string", ""),
+            "regex": result.get("regex", ""),
+            "replacement": result.get("replacement", ""),
+        }
