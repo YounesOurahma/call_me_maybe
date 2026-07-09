@@ -1,34 +1,28 @@
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from typing import Dict, Generic, Optional, TypeVar
-
-T = TypeVar("T")
+from typing import Any, Optional
 
 
-@dataclass(slots=True)
-class TrieNode(Generic[T]):
+class TrieNode:
     """
     A node inside a TokenTrie.
     """
+    def __init__(self) -> None:
+        self.children: dict[int, "TrieNode"] = {}
+        self.terminal: bool = False
+        self.value: Optional[Any] = None
 
-    children: Dict[int, "TrieNode[T]"] = field(default_factory=dict)
-    terminal: bool = False
-    value: Optional[T] = None
 
-
-class TokenTrie(Generic[T]):
+class TokenTrie:
     """
-    Generic trie storing token-id sequences.
+    Trie that stores sequences of token ids.
 
-    The trie is independent of the project domain.
-    Any object can be associated with a sequence.
+    Each complete sequence can be linked to any object
+    (in this project, a FunctionDefinition).
     """
 
     def __init__(self) -> None:
-        self._root: TrieNode[T] = TrieNode()
+        self._root = TrieNode()
 
-    def _follow(self, sequence: tuple[int, ...]) -> Optional[TrieNode[T]]:
+    def _follow(self, sequence: tuple[int, ...]) -> Optional[TrieNode]:
         """
         Follow a sequence inside the trie.
 
@@ -42,14 +36,13 @@ class TokenTrie(Generic[T]):
         node = self._root
 
         for token_id in sequence:
-            node = node.children.get(token_id)
-
-            if node is None:
+            if token_id not in node.children:
                 return None
+            node = node.children[token_id]
 
         return node
 
-    def insert(self, sequence: tuple[int, ...], value: T) -> None:
+    def insert(self, sequence: tuple[int, ...], value: Any) -> None:
         """
         Insert a token sequence together with its associated value.
         """
@@ -57,14 +50,9 @@ class TokenTrie(Generic[T]):
         node = self._root
 
         for token_id in sequence:
-
-            child = node.children.get(token_id)
-
-            if child is None:
-                child = TrieNode()
-                node.children[token_id] = child
-
-            node = child
+            if token_id not in node.children:
+                node.children[token_id] = TrieNode()
+            node = node.children[token_id]
 
         node.terminal = True
         node.value = value
@@ -90,7 +78,7 @@ class TokenTrie(Generic[T]):
 
         return node is not None and node.terminal
 
-    def get(self, sequence: tuple[int, ...]) -> T:
+    def get(self, sequence: tuple[int, ...]) -> Any:
         """
         Return the object associated with a complete sequence.
 
@@ -106,7 +94,5 @@ class TokenTrie(Generic[T]):
             raise ValueError(
                 "Unknown token sequence."
             )
-
-        assert node.value is not None
 
         return node.value

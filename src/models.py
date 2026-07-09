@@ -21,7 +21,7 @@ class TestPrompt(BaseModel):
 
 
 class FunctionCall(BaseModel):
-    """Represents the strict format your final generated output must follow."""
+    """Represents the strict format the final generated output must follow."""
     prompt: str
     name: str
     parameters: Dict[str, Any]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-
+import time
 from llm_sdk import Small_LLM_Model
 
 from .decoder import Decoder
@@ -35,7 +35,7 @@ def save_json(path: Path, data: list[dict]) -> None:
 
 
 def main() -> None:
-
+    start_time = time.perf_counter()
     print("Loading model...")
     model = Small_LLM_Model()
 
@@ -121,7 +121,9 @@ def main() -> None:
     print(
         f"Done. Output written to: {OUTPUT_PATH}"
     )
-
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"Total execution time: {elapsed_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()

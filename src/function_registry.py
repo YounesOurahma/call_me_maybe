@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Iterable
 
 from llm_sdk import Small_LLM_Model
@@ -30,14 +28,9 @@ class FunctionRegistry:
 
         for function in functions:
 
-            token_ids = tuple(
-                model.encode(function.name)[0].tolist()
-            )
+            token_ids = tuple(model.encode(function.name)[0].tolist())
 
-            self._trie.insert(
-                token_ids,
-                function,
-            )
+            self._trie.insert(token_ids, function)
 
     def allowed_next_tokens(self, generated: list[int]) -> set[int]:
         """
