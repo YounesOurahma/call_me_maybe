@@ -18,6 +18,7 @@ class Generator:
         self._model = model
         self._decoder = decoder
         self._registry = registry
+        self._function_prompt_ids = self._encode_function_prompt()
 
     def generate(self, prompt: str) -> FunctionDefinition:
         """
@@ -93,13 +94,58 @@ class Generator:
 
         return "\n".join(lines)
 
-    def _encode_prompt(self, prompt: str) -> list[int]:
+    def _encode_function_prompt(self) -> list[int]:
         """
-        Encode the complete prompt.
+        Encode the static part containing available functions.
         """
 
-        full_prompt = self._build_prompt(prompt)
+        lines = []
 
-        encoded = self._model.encode(full_prompt)
+        lines.append(
+            "Select the best matching function."
+        )
+        lines.append("")
+        lines.append("Available functions:")
+
+        for function in self._registry.functions:
+
+            lines.append(function.name)
+            lines.append(
+                f"Description: {function.description}"
+            )
+
+            if function.parameters:
+                lines.append("Parameters:")
+
+                for name, parameter in function.parameters.items():
+                    lines.append(
+                        f"- {name}: {parameter.type}"
+                    )
+
+            lines.append("")
+
+        lines.append("")
+        lines.append("User request:")
+
+        text = "\n".join(lines)
+
+        encoded = self._model.encode(text)
 
         return encoded.squeeze(0).tolist()
+
+    def _encode_prompt(self, prompt: str) -> list[int]:
+        """
+        Encode only the dynamic user request.
+        """
+
+        encoded = self._model.encode(prompt)
+
+        return (
+            self._function_prompt_ids
+            +
+            encoded.squeeze(0).tolist()
+            +
+            self._model.encode(
+                "\nSelected function:"
+            ).squeeze(0).tolist()
+        )
