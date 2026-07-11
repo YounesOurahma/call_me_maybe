@@ -1,9 +1,5 @@
-from __future__ import annotations
-
 from typing import List
-
 import numpy as np
-
 from .function_registry import FunctionRegistry
 from .models import FunctionDefinition
 

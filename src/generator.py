@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import List
 import numpy as np
 from llm_sdk import Small_LLM_Model
@@ -63,7 +62,7 @@ class Generator:
         Build the prompt sent to the language model.
         """
 
-        lines: list[str] = []
+        lines: List[str] = []
 
         lines.append(
             "Select the best matching function for the user request."
@@ -94,7 +93,7 @@ class Generator:
 
         return "\n".join(lines)
 
-    def _encode_function_prompt(self) -> list[int]:
+    def _encode_function_prompt(self) -> List[int]:
         """
         Encode the static part containing available functions.
         """
@@ -133,7 +132,7 @@ class Generator:
 
         return encoded.squeeze(0).tolist()
 
-    def _encode_prompt(self, prompt: str) -> list[int]:
+    def _encode_prompt(self, prompt: str) -> List[int]:
         """
         Encode only the dynamic user request.
         """
