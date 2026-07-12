@@ -57,42 +57,6 @@ class Generator:
 
         return self._decoder.selected_function(generated)
 
-    def _build_prompt(self, prompt: str) -> str:
-        """
-        Build the prompt sent to the language model.
-        """
-
-        lines: List[str] = []
-
-        lines.append(
-            "Select the best matching function for the user request."
-        )
-        lines.append("")
-        lines.append("Available functions:")
-        lines.append("")
-
-        for function in self._registry.functions:
-
-            lines.append(function.name)
-            lines.append(f"Description: {function.description}")
-
-            if function.parameters:
-                lines.append("Parameters:")
-
-                for name, parameter in function.parameters.items():
-                    lines.append(
-                        f"- {name}: {parameter.type}"
-                    )
-
-            lines.append("")
-
-        lines.append("User request:")
-        lines.append(prompt)
-        lines.append("")
-        lines.append("Selected function:")
-
-        return "\n".join(lines)
-
     def _encode_function_prompt(self) -> List[int]:
         """
         Encode the static part containing available functions.
