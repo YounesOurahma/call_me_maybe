@@ -1,6 +1,6 @@
 import re
 from collections import deque
-from typing import Any
+from typing import Any, List
 
 from .models import FunctionDefinition
 
@@ -77,22 +77,18 @@ class ParameterParser:
                 raise ValueError(
                     f"Unsupported parameter type: {parameter_type!r}"
                 )
-
         return parameters
 
-    def _extract_numbers(self, prompt: str) -> list[int | float]:
+    def _extract_numbers(self, prompt: str) -> List[int | float]:
         """
         Extract every numeric literal from the prompt.
         """
 
-        numbers: list[int | float] = []
+        numbers: List[float] = []
 
         for match in self._NUMBER_PATTERN.findall(prompt):
 
-            if "." in match:
-                numbers.append(float(match))
-            else:
-                numbers.append(int(match))
+            numbers.append(float(match))
 
         return numbers
 
@@ -101,7 +97,7 @@ class ParameterParser:
         prompt: str,
         *,
         ignored_words: set[str],
-    ) -> list[str]:
+    ) -> List[str]:
         """
         Extract candidate string values.
 
@@ -118,7 +114,7 @@ class ParameterParser:
 
         words = self._WORD_PATTERN.findall(prompt)
 
-        result: list[str] = []
+        result: List[str] = []
 
         for word in words:
 
@@ -137,7 +133,7 @@ class ParameterParser:
 
         return [" ".join(result)]
 
-    def _extract_quoted_strings(self, prompt: str) -> list[str]:
+    def _extract_quoted_strings(self, prompt: str) -> List[str]:
         """
         Extract every quoted string from the prompt.
 
@@ -146,7 +142,7 @@ class ParameterParser:
 
         pattern = re.compile(r'"([^"]*)"|\'([^\']*)\'')
 
-        strings: list[str] = []
+        strings: List[str] = []
 
         for match in pattern.finditer(prompt):
             value = match.group(1)
@@ -182,10 +178,10 @@ class ParameterParser:
 
     def _consume_number(
         self,
-        numbers: deque[int | float],
+        numbers: deque[float],
         *,
         parameter_name: str,
-    ) -> int | float:
+    ) -> float:
         """
         Consume the next available number.
 

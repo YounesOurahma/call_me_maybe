@@ -42,7 +42,7 @@ class FunctionRegistry:
 
     def is_complete(self, generated: list[int]) -> bool:
         """
-        Return True iff the generated sequence exactly
+        Return True if the generated sequence exactly
         matches one registered function.
         """
 
