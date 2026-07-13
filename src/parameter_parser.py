@@ -249,59 +249,58 @@ class ParameterParser:
         Extract parameters for string replacement functions.
         """
 
-        result: dict[str, str] = {}
+        result: dict[str, str] = {
+            "source_string": "",
+            "regex": "",
+            "replacement": "",
+        }
 
         quoted = self._extract_quoted_strings(prompt)
 
         lower = prompt.lower()
 
-        # Detect the pattern
-        if "vowel" in lower:
-            result["regex"] = "[aeiouAEIOU]"
-            if "asterisk" in lower:
-                result["replacement"] = "*"
-
-        elif "number" in lower:
-            result["regex"] = r"\d+"
-
-        elif len(quoted) >= 2:
-            result["regex"] = quoted[0]
-
+        in_match = re.search(
+            r'\bin\s+(["\'])(.*?)\1', prompt, re.IGNORECASE
+            )
+        if in_match:
+            result["source_string"] = in_match.group(2)
         else:
-            result["regex"] = ""
+            result["source_string"] = max(quoted, key=lambda s: len(s))
 
-        # Detect:
-        # Substitute 'cat' with 'dog' in 'text'
-        if "substitute" in lower and len(quoted) >= 3:
-
-            result["regex"] = quoted[0]
-            result["replacement"] = quoted[1]
-            result["source_string"] = quoted[2]
-
-            return {
-                "source_string": result.get("source_string", ""),
-                "regex": result.get("regex", ""),
-                "replacement": result.get("replacement", ""),
-            }
-
-        # Detect:
-        # Replace ... in "text" with replacement
-
-        if quoted:
-            result["source_string"] = quoted[0]
-
-        words = prompt.split()
-
-        if "with" in words:
-
-            index = words.index("with")
-
-            if index + 1 < len(words):
-                if "replacement" not in result:
-                    result["replacement"] = words[index + 1]
-
+        if "asterisk" in lower or "star" in lower:
+            result["replacement"] = "*"
         else:
-            result["replacement"] = ""
+            with_match = re.search(
+                r'\bwith\s+["\']([^"\']*)["\']', prompt, re.IGNORECASE
+                )
+            if with_match:
+                result["replacement"] = with_match.group(1)
+            else:
+                plain_with = re.search(
+                    r'\bwith\s+(?:a[n]?\s+)?(\S+)', prompt, re.IGNORECASE
+                    )
+                if plain_with:
+                    result["replacement"] = plain_with.group(1)
+
+        regex_patterns = {
+            "vowel": r"[aeiouAEIOU]",
+            "digit": r"\d+",
+            "number": r"\d+",
+            "space": r"\s+",
+            "whitespace": r"\s+",
+            "letter": r"[a-zA-Z]",
+            "alphabet": r"[a-zA-Z]",
+        }
+        for keyword, pattern in regex_patterns.items():
+            if keyword in lower:
+                result["regex"] = pattern
+                break
+        if result["regex"] == "":
+            left = [q for q in quoted
+                    if q != result["replacement"]
+                    and q != result["source_string"]]
+            if left:
+                result["regex"] = left[0]
 
         return {
             "source_string": result.get("source_string", ""),
