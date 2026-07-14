@@ -26,7 +26,7 @@ class FunctionRegistry:
         self._functions = list(functions)
         self._trie: TokenTrie[FunctionDefinition] = TokenTrie()
 
-        for function in functions:
+        for function in self._functions:
 
             token_ids = tuple(model.encode(function.name)[0].tolist())
 

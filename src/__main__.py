@@ -1,25 +1,90 @@
+import argparse
 import json
-from pathlib import Path
+import sys
 import time
+from pathlib import Path
+from typing import Any, cast
+
 from llm_sdk import Small_LLM_Model
+
 from .decoder import Decoder
 from .function_registry import FunctionRegistry
 from .generator import Generator
-from .models import FunctionDefinition, FunctionCall, TestPrompt
+from .models import FunctionCall, FunctionDefinition, TestPrompt
 from .parameter_parser import ParameterParser
 
+DEFAULT_FUNCTIONS_PATH = Path("data/input/functions_definition.json")
+DEFAULT_PROMPTS_PATH = Path("data/input/function_calling_tests.json")
+DEFAULT_OUTPUT_PATH = Path("data/output/function_calling_results.json")
 
-FUNCTIONS_PATH = Path("data/input/functions_definition.json")
-PROMPTS_PATH = Path("data/input/function_calling_tests.json")
-OUTPUT_PATH = Path("data/output/function_calls.json")
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed arguments with ``functions_definition``, ``input``,
+        and ``output`` attributes.
+    """
+    parser = argparse.ArgumentParser(
+        description="Translate natural-language prompts into function calls.",
+    )
+    parser.add_argument(
+        "--functions_definition",
+        type=Path,
+        default=DEFAULT_FUNCTIONS_PATH,
+        help="Path to the JSON file describing available functions.",
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_PROMPTS_PATH,
+        help="Path to the JSON file containing test prompts.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT_PATH,
+        help="Path where the resulting JSON file will be written.",
+    )
+    return parser.parse_args()
 
 
-def load_json(path: Path) -> list:
+def load_json(path: Path) -> list[Any]:
+    """Load a JSON array from disk.
+
+    Parameters
+    ----------
+    path:
+        Path to the JSON file to load.
+
+    Returns
+    -------
+    list[Any]
+        The parsed JSON content.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``path`` does not exist.
+    json.JSONDecodeError
+        If ``path`` does not contain valid JSON.
+    """
     with path.open("r", encoding="utf-8") as file:
-        return json.load(file)
+        return cast(list[Any], json.load(file))
 
 
-def save_json(path: Path, data: list[dict]) -> None:
+def save_json(path: Path, data: list[dict[str, Any]]) -> None:
+    """Write a list of dictionaries to disk as a JSON array.
+
+    Parameters
+    ----------
+    path:
+        Destination path. Parent directories are created if needed.
+    data:
+        The list of dictionaries to serialize.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with path.open("w", encoding="utf-8") as file:
@@ -31,43 +96,78 @@ def save_json(path: Path, data: list[dict]) -> None:
         )
 
 
+def load_input_files(
+    functions_path: Path,
+    prompts_path: Path,
+) -> tuple[list[FunctionDefinition], list[TestPrompt]]:
+    """Load and validate both input files, failing gracefully.
+
+    Parameters
+    ----------
+    functions_path:
+        Path to the function catalog JSON file.
+    prompts_path:
+        Path to the test prompts JSON file.
+
+    Returns
+    -------
+    tuple[list[FunctionDefinition], list[TestPrompt]]
+        The parsed functions and prompts.
+    """
+    try:
+        functions_data = load_json(functions_path)
+        functions = [FunctionDefinition(**item) for item in functions_data]
+    except FileNotFoundError:
+        print(f"Error: functions definition file not found: {functions_path}")
+        sys.exit(1)
+    except json.JSONDecodeError as exc:
+        print(f"Error: invalid JSON in {functions_path}: {exc}")
+        sys.exit(1)
+    except (TypeError, ValueError) as exc:
+        print(
+            f"Error: {functions_path} "
+            f"does not match the expected schema: {exc}"
+            )
+        sys.exit(1)
+
+    try:
+        prompts_data = load_json(prompts_path)
+        prompts = [TestPrompt(**item) for item in prompts_data]
+    except FileNotFoundError:
+        print(f"Error: prompts file not found: {prompts_path}")
+        sys.exit(1)
+    except json.JSONDecodeError as exc:
+        print(f"Error: invalid JSON in {prompts_path}: {exc}")
+        sys.exit(1)
+    except (TypeError, ValueError) as exc:
+        print(
+            f"Error: {prompts_path} does not match the expected schema: {exc}"
+            )
+        sys.exit(1)
+
+    return functions, prompts
+
+
 def main() -> None:
+    """Run the full function-calling pipeline end to end."""
+    args = parse_args()
+
     start_time = time.perf_counter()
     print("Loading model...")
     model = Small_LLM_Model()
 
-    print("Loading functions...")
-    functions_data = load_json(FUNCTIONS_PATH)
-
-    functions = [
-        FunctionDefinition(**item)
-        for item in functions_data
-    ]
-
-    registry = FunctionRegistry(
-        functions,
-        model,
+    print("Loading functions and prompts...")
+    functions, prompts = load_input_files(
+        args.functions_definition,
+        args.input,
     )
 
+    registry = FunctionRegistry(functions, model)
     decoder = Decoder(registry)
-
-    generator = Generator(
-        model,
-        decoder,
-        registry,
-    )
-
+    generator = Generator(model, decoder, registry)
     parser = ParameterParser()
 
-    print("Loading prompts...")
-    prompts_data = load_json(PROMPTS_PATH)
-
-    prompts = [
-        TestPrompt(**item)
-        for item in prompts_data
-    ]
-
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
 
     print("Running inference...")
 
@@ -76,14 +176,8 @@ def main() -> None:
         print(f"[{index}/{len(prompts)}] {test.prompt}")
 
         try:
-            function = generator.generate(
-                test.prompt
-            )
-
-            parameters = parser.parse(
-                test.prompt,
-                function,
-            )
+            function = generator.generate(test.prompt)
+            parameters = parser.parse(test.prompt, function)
 
             result = FunctionCall(
                 prompt=test.prompt,
@@ -91,16 +185,10 @@ def main() -> None:
                 parameters=parameters,
             )
 
-            results.append(
-                result.model_dump()
-            )
+            results.append(result.model_dump())
 
         except Exception as exc:
-
-            print(
-                f"Failed on prompt: {test.prompt}"
-            )
-
+            print(f"Failed on prompt: {test.prompt}")
             results.append(
                 {
                     "prompt": test.prompt,
@@ -110,14 +198,13 @@ def main() -> None:
 
     print("Saving output...")
 
-    save_json(
-        OUTPUT_PATH,
-        results,
-    )
+    try:
+        save_json(args.output, results)
+    except OSError as exc:
+        print(f"Error: could not write output file {args.output}: {exc}")
+        sys.exit(1)
 
-    print(
-        f"Done. Output written to: {OUTPUT_PATH}"
-    )
+    print(f"Done. Output written to: {args.output}")
     end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"Total execution time: {elapsed_time:.2f} seconds")
