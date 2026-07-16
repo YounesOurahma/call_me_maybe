@@ -94,7 +94,7 @@ class Generator:
 
         encoded = self._model.encode(text)
 
-        return encoded.squeeze(0).tolist()
+        return encoded[0].tolist()
 
     def _encode_prompt(self, prompt: str) -> List[int]:
         """

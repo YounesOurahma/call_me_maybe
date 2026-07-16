@@ -165,7 +165,7 @@ def main() -> None:
     registry = FunctionRegistry(functions, model)
     decoder = Decoder(registry)
     generator = Generator(model, decoder, registry)
-    parser = ParameterParser()
+    parser = ParameterParser(model)
 
     results: list[dict[str, Any]] = []
 

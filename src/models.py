@@ -1,10 +1,12 @@
 from typing import Any, Dict
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ParameterDef(BaseModel):
     """Represents the type of a specific parameter('number' or 'string')."""
     type: str
+
+    model_config = ConfigDict(extra='forbid')
 
 
 class FunctionDefinition(BaseModel):
@@ -13,6 +15,8 @@ class FunctionDefinition(BaseModel):
     description: str
     parameters: Dict[str, ParameterDef]
     returns: ParameterDef
+
+    model_config = ConfigDict(extra='forbid')
 
 
 class TestPrompt(BaseModel):
@@ -25,3 +29,5 @@ class FunctionCall(BaseModel):
     prompt: str
     name: str
     parameters: Dict[str, Any]
+
+    model_config = ConfigDict(extra='forbid')
