@@ -151,7 +151,11 @@ class ParameterParser:
             word for word in _WORD_PATTERN.findall(prompt)
         ]
 
-        candidates = quoted + words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
+        # candidates = quoted + words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
+        if quoted:
+            candidates = quoted + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
+        else:
+            candidates = words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
         return list(dict.fromkeys(c for c in candidates if c))
 
     # -- prompt construction --------------------------------------------- #
@@ -193,6 +197,22 @@ class ParameterParser:
             "- Do NOT output JSON.",
             "- Do NOT include the parameter name.",
             "- Output exactly one value.",
+            "",
+            "Example:",
+            "",
+            "User request:",
+            'Replace all digits in "abc123" with asterisks',
+            "",
+            "Parameter: source_string",
+            'Answer: abc123',
+            "",
+            "Parameter: regex",
+            "Answer: \\d+",
+            "",
+            "Parameter: replacement",
+            "Answer: *",
+            "",
+            "Now solve the real request.",
             "",
             "Answer:",
         ]
@@ -245,13 +265,10 @@ class ParameterParser:
         encoded = self._encode_candidates(candidates)
 
         best_candidate = candidates[0]
-        best_score = -np.inf
 
-        for candidate, token_ids in encoded.items():
-            score = self._score_candidate(prompt_ids, token_ids)
-            if score > best_score:
-                best_score = score
-                best_candidate = candidate
+        scores = [self._score_candidate(prompt_ids, token_ids) for token_ids in encoded.values()]
+        best_index = int(np.argmax(scores))
+        best_candidate = list(encoded.keys())[best_index]
 
         return best_candidate
 
