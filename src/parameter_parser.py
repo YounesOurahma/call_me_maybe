@@ -151,11 +151,17 @@ class ParameterParser:
             word for word in _WORD_PATTERN.findall(prompt)
         ]
 
+        candidates = quoted
         # candidates = quoted + words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
-        if quoted:
-            candidates = quoted + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
-        else:
-            candidates = words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
+        # if quoted:
+        #     candidates = quoted + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
+        # else:
+        #     candidates = words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
+        for word in words:
+            if word not in quoted:
+                candidates.append(word)
+        candidates += _COMMON_REGEX_CANDIDATES
+        candidates += _COMMON_SYMBOL_CANDIDATES
         return list(dict.fromkeys(c for c in candidates if c))
 
     # -- prompt construction --------------------------------------------- #
