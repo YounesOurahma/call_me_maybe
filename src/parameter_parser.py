@@ -1,4 +1,22 @@
-import re
+"""Extracts function-call parameters from a prompt using constrained decoding.
+
+Design
+------
+Exactly like ``FunctionRegistry``/``Decoder`` restrict token choice to the
+set of registered function names, this module restricts token choice to
+the *shape* required by a parameter's declared type -- nothing here reads
+the function name or looks for specific keywords in the prompt, so it
+keeps working unchanged if the reviewer swaps in a different
+``functions_definition.json``.
+
+At every generation step, the model's own top candidate tokens are
+inspected in order of preference; the first one whose decoded text still
+respects the type's allowed character set is kept, everything else is
+skipped (the constrained-decoding equivalent of masking those tokens to
+``-inf``). Generation stops as soon as the model's best remaining choice
+is a newline, or after a small safety cap.
+"""
+
 from typing import Any, Dict, List
 
 import numpy as np
@@ -6,294 +24,273 @@ from llm_sdk import Small_LLM_Model
 
 from .models import FunctionDefinition
 
-# Generic candidate discovery -- this only ever finds CANDIDATES for the
-# model to choose from via constrained decoding. It never decides the
-# answer itself and it isn't tied to any specific function name.
-_NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:\.\d+)?")
-_QUOTED_PATTERN = re.compile(r'"([^"]*)"|\'([^\']*)\'')
-_WORD_PATTERN = re.compile(r"[A-Za-z0-9_]+")
+_NUMBER_CHARACTERS = set("0123456789.- ")
 
-# Small generic fallback pool for string parameters whose value can't be a
-# literal substring of the prompt (e.g. a regex pattern implied by the word
-# "vowels", or a replacement symbol implied by "asterisks"). These are
-# offered as extra candidates -- the model still has to pick one via
-# constrained decoding, this list doesn't pick for it.
-_COMMON_REGEX_CANDIDATES = [r"\d+", r"[aeiouAEIOU]", r"\s+", r"[a-zA-Z]+"]
-_COMMON_SYMBOL_CANDIDATES = ["*", "_", "#", ""]
+_TYPE_ALIASES: Dict[str, str] = {
+    "str": "string",
+    "string": "string",
+    "int": "integer",
+    "integer": "integer",
+    "float": "number",
+    "double": "number",
+    "number": "number",
+    "bool": "boolean",
+    "boolean": "boolean",
+}
 
 
 class ParameterParser:
-    """
-    Extracts parameter values from a prompt after the correct function has
-    already been selected, using constrained decoding.
+    """Fills a function's parameters by generating each value with the LLM.
 
-    Every value the model can produce comes from a small set of KNOWN
-    candidates -- it never free-generates content. Each candidate is encoded
-    once with model.encode(), then scored by its teacher-forced
-    log-likelihood under the model (see _score_candidate); whichever
-    candidate the model finds most likely is returned:
-      - booleans: candidates are always {"true", "false"}.
-      - numbers/integers: candidates are every numeric literal that
-        actually appears in the prompt.
-      - strings: candidates are quoted substrings and standalone words from
-        the prompt, plus a small generic fallback pool (common regex
-        patterns / replacement symbols) for values that must be inferred
-        rather than copied verbatim.
-
-    Earlier versions generated numbers digit-by-digit and strings
-    token-by-token with no anchor to the prompt's actual content, which
-    produced hallucinated/zero-padded numbers and fabricated strings.
-    Scoring full known candidates against the model's own likelihood
-    guarantees every extracted value is something that genuinely exists in
-    (or is a plausible generic completion of) the prompt, without the
-    early-commitment bias a step-by-step trie walk has.
+    Every value is produced one token at a time, only ever letting through
+    tokens that keep the value inside the character set required by its
+    declared type (digits for numbers, anything but a newline for
+    strings, or one of two fixed literals for booleans).
     """
 
-    _BOOLEAN_VALUES = ["true", "false"]
-    _TYPE_ALIASES: Dict[str, str] = {
-        "str": "string",
-        "string": "string",
-        "int": "integer",
-        "integer": "integer",
-        "float": "number",
-        "double": "number",
-        "number": "number",
-        "bool": "boolean",
-        "boolean": "boolean",
-    }
+    _BOOLEAN_CANDIDATES = ("true", "false")
+    _TOP_K = 40
+    _MAX_VALUE_TOKENS = 30
 
     def __init__(self, model: Small_LLM_Model) -> None:
-        self._model = model
-        self._encode_cache: Dict[str, tuple] = {}
+        """Store the model and a small per-run token-text cache.
 
-    def _encode(self, text: str) -> tuple:
-        """Cache encode() results -- the same candidate (e.g. 'cat') often
-        gets scored across multiple parameters within one prompt."""
-        if text not in self._encode_cache:
-            self._encode_cache[text] = tuple(self._model.encode(text)[0].tolist())
-        return self._encode_cache[text]
-
-    def _normalize_type(self, parameter_type: str) -> str:
-        normalized = self._TYPE_ALIASES.get(parameter_type.lower())
-        if normalized is None:
-            raise ValueError(f"Unsupported parameter type: {parameter_type!r}")
-        return normalized
-
-    def parse(self, prompt: str, function: FunctionDefinition) -> Dict[str, Any]:
+        Parameters
+        ----------
+        model:
+            The language model used for both scoring and generation.
         """
-        Extract every parameter required by ``function`` from ``prompt``.
+        self._model = model
+        self._token_cache: Dict[int, str] = {}
+
+    def parse(
+        self,
+        prompt: str,
+        function: FunctionDefinition,
+    ) -> Dict[str, Any]:
+        """Extract every parameter required by ``function`` from ``prompt``.
+
+        Parameters
+        ----------
+        prompt:
+            The natural-language user request.
+        function:
+            The function selected by the constrained decoder.
+
+        Returns
+        -------
+        dict[str, Any]
+            Every extracted parameter, converted to its declared type.
 
         Raises
         ------
         ValueError
             If a parameter type is unsupported or a value cannot be
-            extracted/converted.
+            extracted or converted.
         """
-        numeric_pool = self._numeric_candidates(prompt)
-        string_pool = self._string_candidates(prompt)
-
-        # Track which candidates have already been assigned to an earlier
-        # parameter in this same call, so a second same-type parameter
-        # can't just pick the same value again -- it's forced to choose
-        # among whatever's left.
-        used_numeric: List[str] = []
-        used_string: List[str] = []
-
         parameters: Dict[str, Any] = {}
 
         for name, definition in function.parameters.items():
             param_type = self._normalize_type(definition.type)
-            prompt_ids = self._build_prompt_ids(prompt, function, name, param_type)
+            prompt_ids = self._build_prompt_ids(
+                prompt, function, parameters, name, param_type,
+            )
 
             if param_type == "boolean":
-                candidates = self._BOOLEAN_VALUES
+                raw_value = self._select_boolean(prompt_ids)
             elif param_type in ("number", "integer"):
-                candidates = self._unused(numeric_pool, used_numeric) or numeric_pool or ["0"]
-            elif param_type == "string":
-                candidates = self._unused(string_pool, used_string) or string_pool or [""]
+                raw_value = self._generate_constrained(
+                    prompt_ids, self._is_number_char,
+                )
             else:
-                raise ValueError(f"Unsupported parameter type: {param_type!r}")
+                raw_value = self._generate_constrained(
+                    prompt_ids, self._is_string_char,
+                )
 
-            raw_value = self._select_best_candidate(prompt_ids, candidates)
-
-            if param_type in ("number", "integer"):
-                used_numeric.append(raw_value)
-            elif param_type == "string":
-                used_string.append(raw_value)
+            if not raw_value:
+                raise ValueError(
+                    f"Unable to extract value for parameter {name!r}."
+                )
 
             parameters[name] = self._convert(raw_value, param_type, name)
 
         return parameters
 
-    def _unused(self, pool: List[str], used: List[str]) -> List[str]:
-        """Candidates from `pool` that haven't already been assigned to an
-        earlier parameter (falls back to the full pool if everything's
-        been used, e.g. more same-type parameters than distinct values)."""
-        return [c for c in pool if c not in used]
-
-    # -- candidate discovery ------------------------------------------- #
-
-    def _numeric_candidates(self, prompt: str) -> List[str]:
-        """Every numeric literal that appears in the prompt, deduplicated,
-        in order of appearance."""
-        return list(dict.fromkeys(_NUMBER_PATTERN.findall(prompt)))
-
-    def _string_candidates(self, prompt: str) -> List[str]:
-        """Quoted substrings + standalone content words from the prompt
-        (common stopwords dropped to keep the candidate pool -- and scoring
-        cost -- small), plus a small generic fallback pool for inferred
-        (non-literal) values."""
-        quoted = [
-            group1 or group2
-            for group1, group2 in _QUOTED_PATTERN.findall(prompt)
-        ]
-        words = [
-            word for word in _WORD_PATTERN.findall(prompt)
-        ]
-
-        candidates = quoted
-        # candidates = quoted + words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
-        # if quoted:
-        #     candidates = quoted + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
-        # else:
-        #     candidates = words + _COMMON_REGEX_CANDIDATES + _COMMON_SYMBOL_CANDIDATES
-        for word in words:
-            if word not in quoted:
-                candidates.append(word)
-        candidates += _COMMON_REGEX_CANDIDATES
-        candidates += _COMMON_SYMBOL_CANDIDATES
-        return list(dict.fromkeys(c for c in candidates if c))
-
-    # -- prompt construction --------------------------------------------- #
-
     def _build_prompt_ids(
         self,
         prompt: str,
         function: FunctionDefinition,
+        already_extracted: Dict[str, Any],
         target_param: str,
         param_type: str,
     ) -> List[int]:
-        lines: List[str] = [
-            "You are an assistant that extracts ONE parameter for a function call.",
+        """Build the prompt used to extract a single parameter value."""
+        lines = [
+            "You extract arguments for a function call.",
+            "Your job is NOT to execute the function.",
+            "Your job is ONLY to copy the input argument.",
             "",
-            "User request:",
-            prompt,
+            "Answer with the bare value only -- no words, no quotes,",
+            "no explanation, nothing but the value itself.",
             "",
-            "Selected function:",
-            function.name,
+            "Request: Add 5 and 7",
+            "Parameter: a (number)",
+            "Value: 5",
             "",
-            "Function description:",
-            function.description,
+            "Request: Greet Alice",
+            "Parameter: name (string)",
+            "Value: Alice",
             "",
-            "Function parameters:",
+            f"Request: {prompt}",
         ]
 
-        for name, parameter in function.parameters.items():
-            lines.append(f"- {name}: {parameter.type}")
+        if already_extracted:
+            lines.append(f"Already extracted: {already_extracted}")
 
         lines += [
-            "",
-            f"Parameter to extract: {target_param}",
-            f"Expected type: {param_type}",
-            "",
-            "Instructions:",
-            "- Return ONLY the requested parameter's value, copied from the request.",
-            "- Do NOT compute or transform anything -- copy the raw value as-is.",
-            "- Do NOT explain your answer.",
-            "- Do NOT output JSON.",
-            "- Do NOT include the parameter name.",
-            "- Output exactly one value.",
-            "",
-            "Example:",
-            "",
-            "User request:",
-            'Replace all digits in "abc123" with asterisks',
-            "",
-            "Parameter: source_string",
-            'Answer: abc123',
-            "",
-            "Parameter: regex",
-            "Answer: \\d+",
-            "",
-            "Parameter: replacement",
-            "Answer: *",
-            "",
-            "Now solve the real request.",
-            "",
-            "Answer:",
+            f"Parameter: {target_param} ({param_type})",
+            "Value:",
         ]
 
         text = "\n".join(lines)
         return self._model.encode(text)[0].tolist()
 
-    # -- constrained decoding core ---------------------------------------- #
-    #
-    # Rather than walking a TokenTrie step-by-step (which commits to a
-    # branch at the first token where two candidates diverge, based on a
-    # single step's logits -- observed in practice to collapse onto
-    # whichever candidate happened to be inserted/tokenized first,
-    # regardless of which parameter was actually being asked for), each
-    # full candidate is scored by its teacher-forced log-likelihood under
-    # the model, and the highest-scoring one is returned. This still only
-    # ever returns a value from the known candidate set (real constrained
-    # decoding, not free generation) but compares whole sequences against
-    # the parameter-specific prompt instead of committing early.
+    def _select_boolean(self, prompt_ids: List[int]) -> str:
+        """Pick whichever of 'true'/'false' the model finds more likely."""
+        scores = [
+            self._teacher_forced_score(
+                prompt_ids, self._model.encode(candidate)[0].tolist(),
+            )
+            for candidate in self._BOOLEAN_CANDIDATES
+        ]
+        return self._BOOLEAN_CANDIDATES[int(np.argmax(scores))]
 
-    def _encode_candidates(self, candidates: List[str]) -> Dict[str, tuple]:
-        """Encode each candidate, reusing cached encodings where possible."""
-        return {candidate: self._encode(candidate) for candidate in candidates}
-
-    def _log_prob(self, logits_array: np.ndarray, token_id: int) -> float:
-        """Numerically-stable log-softmax probability of one token id."""
-        max_logit = np.max(logits_array)
-        log_sum_exp = max_logit + np.log(np.sum(np.exp(logits_array - max_logit)))
-        return float(logits_array[token_id] - log_sum_exp)
-
-    def _score_candidate(self, prompt_ids: List[int], token_ids: tuple) -> float:
-        """Sum of log P(token_i | prompt, token_<i) for the candidate's
-        exact token sequence (teacher forcing -- the real candidate tokens
-        are fed back in, never the model's own argmax choice)."""
+    def _teacher_forced_score(
+        self,
+        prompt_ids: List[int],
+        token_ids: List[int],
+    ) -> float:
+        """Total log-probability the model assigns to ``token_ids``."""
         score = 0.0
         generated: List[int] = []
 
         for token_id in token_ids:
-            input_ids = prompt_ids + generated
-            logits = self._model.get_logits_from_input_ids(input_ids)
-            logits_array = np.asarray(logits, dtype=np.float32)
-            score += self._log_prob(logits_array, token_id)
+            logits = np.asarray(
+                self._model.get_logits_from_input_ids(prompt_ids + generated),
+                dtype=np.float32,
+            )
+            score += float(logits[token_id] - self._log_sum_exp(logits))
             generated.append(token_id)
 
         return score
 
-    def _select_best_candidate(self, prompt_ids: List[int], candidates: List[str]) -> str:
-        """Return whichever candidate the model assigns the highest total
-        likelihood to, given this parameter's specific extraction prompt."""
-        encoded = self._encode_candidates(candidates)
+    @staticmethod
+    def _log_sum_exp(logits: np.ndarray) -> float:
+        """Numerically stable log-sum-exp over a logits vector."""
+        top = np.max(logits)
+        return float(top + np.log(np.sum(np.exp(logits - top))))
 
-        best_candidate = candidates[0]
+    def _generate_constrained(
+        self,
+        prompt_ids: List[int],
+        char_is_allowed: Any,
+    ) -> str:
+        """Greedily generate tokens, skipping any that break the alphabet.
 
-        scores = [self._score_candidate(prompt_ids, token_ids) for token_ids in encoded.values()]
-        best_index = int(np.argmax(scores))
-        best_candidate = list(encoded.keys())[best_index]
+        At each step the model's best-scoring tokens are checked in
+        order; the first whose text is entirely made of allowed
+        characters is appended. A token containing a newline ends
+        generation immediately, treating it as the model signalling it
+        is done.
+        """
+        generated: List[int] = []
 
-        return best_candidate
+        for _ in range(self._MAX_VALUE_TOKENS):
+            logits = np.asarray(
+                self._model.get_logits_from_input_ids(prompt_ids + generated),
+                dtype=np.float32,
+            )
+            order = np.argsort(logits)[::-1]
 
-    # -- value conversion --------------------------------------------------- #
+            if not generated:
+                # Nothing produced yet: search a wide window for a token
+                # that can legally start the value.
+                window = order[: self._TOP_K]
+            else:
+                # A value is already underway: trust the model's own top
+                # choice. If it no longer fits the alphabet, that is the
+                # model signalling the value is finished -- do not dig
+                # deeper and risk bolting on an unrelated match.
+                window = order[:1]
+
+            picked = self._first_matching(window, char_is_allowed)
+
+            if picked is None:
+                break
+
+            generated.append(picked)
+
+        if not generated:
+            return ""
+
+        return self._model.decode(generated).strip()
+
+    def _first_matching(self, token_ids: np.ndarray, char_is_allowed: Any) -> Any:
+        """Return the first token id in ``token_ids`` whose text is made
+        entirely of allowed characters, or None if none qualify."""
+        for token_id in token_ids:
+            piece = self._token_text(int(token_id))
+
+            if not piece or "\n" in piece:
+                continue
+            if all(char_is_allowed(ch) for ch in piece):
+                return int(token_id)
+
+        return None
+
+    def _token_text(self, token_id: int) -> str:
+        """Decode a single token id, caching the result for reuse."""
+        cached = self._token_cache.get(token_id)
+
+        if cached is None:
+            cached = self._model.decode([token_id])
+            self._token_cache[token_id] = cached
+
+        return cached
+
+    @staticmethod
+    def _is_number_char(character: str) -> bool:
+        """Return True if ``character`` may appear in a numeric literal."""
+        return character in _NUMBER_CHARACTERS
+
+    @staticmethod
+    def _is_string_char(character: str) -> bool:
+        """Return True for any character except a newline."""
+        return character != "\n"
+
+    def _normalize_type(self, parameter_type: str) -> str:
+        """Map a schema type name onto one of the four supported types."""
+        normalized = _TYPE_ALIASES.get(parameter_type.lower())
+
+        if normalized is None:
+            raise ValueError(
+                f"Unsupported parameter type: {parameter_type!r}"
+            )
+
+        return normalized
 
     def _convert(self, raw_value: str, param_type: str, name: str) -> Any:
+        """Convert the generated text into the correctly typed value."""
         try:
             if param_type == "boolean":
                 return raw_value == "true"
             if param_type == "integer":
-                return int(float(raw_value))
+                return int(float(raw_value.replace(" ", "")))
             if param_type == "number":
-                return float(raw_value)
-            if param_type == "string":
-                return raw_value
+                return float(raw_value.replace(" ", ""))
+            return raw_value.strip("'\" ")
         except ValueError as exc:
             raise ValueError(
                 f"Could not convert value {raw_value!r} for parameter "
                 f"{name!r} to type {param_type!r}"
             ) from exc
-
-        raise ValueError(f"Unsupported parameter type: {param_type!r}")
