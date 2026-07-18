@@ -1,27 +1,6 @@
-"""Extracts function-call parameters from a prompt using constrained decoding.
-
-Design
-------
-Exactly like ``FunctionRegistry``/``Decoder`` restrict token choice to the
-set of registered function names, this module restricts token choice to
-the *shape* required by a parameter's declared type -- nothing here reads
-the function name or looks for specific keywords in the prompt, so it
-keeps working unchanged if the reviewer swaps in a different
-``functions_definition.json``.
-
-At every generation step, the model's own top candidate tokens are
-inspected in order of preference; the first one whose decoded text still
-respects the type's allowed character set is kept, everything else is
-skipped (the constrained-decoding equivalent of masking those tokens to
-``-inf``). Generation stops as soon as the model's best remaining choice
-is a newline, or after a small safety cap.
-"""
-
 from typing import Any, Dict, List
-
 import numpy as np
 from llm_sdk import Small_LLM_Model
-
 from .models import FunctionDefinition
 
 _NUMBER_CHARACTERS = set("0123456789.- ")
@@ -124,35 +103,55 @@ class ParameterParser:
         target_param: str,
         param_type: str,
     ) -> List[int]:
-        """Build the prompt used to extract a single parameter value."""
+        """
+        Build the prompt used to extract one parameter.
+
+        The model must copy the requested argument from the user's request.
+        It must never execute the function.
+        """
+
         lines = [
-            "You extract arguments for a function call.",
-            "Your job is NOT to execute the function.",
-            "Your job is ONLY to copy the input argument.",
+            "You extract ONE function parameter.",
             "",
-            "Answer with the bare value only -- no words, no quotes,",
-            "no explanation, nothing but the value itself.",
+            "Do NOT execute the function.",
+            "Do NOT answer the user's request.",
+            "Do NOT solve anything.",
+            "Copy the requested value exactly.",
+            "Return ONLY the value.",
             "",
-            "Request: Add 5 and 7",
-            "Parameter: a (number)",
-            "Value: 5",
-            "",
-            "Request: Greet Alice",
-            "Parameter: name (string)",
-            "Value: Alice",
+            f"Function: {function.name}",
+            f"Description: {function.description}",
             "",
             f"Request: {prompt}",
+            "DO NOT execute the function."
+            "Extract from the Request only."
+            "NO operation"
+            "Examples:",
+            "",
+            "Request: Reverse the string 'hello'",
+            "Parameter: s",
+            "Answer: hello",
+            "",
+            "No operations just extraction from the Request prompt."
+            "",
         ]
 
         if already_extracted:
-            lines.append(f"Already extracted: {already_extracted}")
+            extracted = ", ".join(
+                f"{k}={v}" for k, v in already_extracted.items()
+            )
+            lines.append(f"Already extracted: {extracted}")
 
         lines += [
-            f"Parameter: {target_param} ({param_type})",
+            "",
+            f"Parameter: {target_param}",
+            f"Type: {param_type}",
+            "",
             "Value:",
         ]
 
         text = "\n".join(lines)
+
         return self._model.encode(text)[0].tolist()
 
     def _select_boolean(self, prompt_ids: List[int]) -> str:
