@@ -6,11 +6,18 @@ from pathlib import Path
 from typing import Any, cast
 
 from llm_sdk import Small_LLM_Model
+from pydantic import ValidationError
 
 from .decoder import Decoder
 from .function_registry import FunctionRegistry
 from .generator import Generator
-from .models import FunctionCall, FunctionDefinition, TestPrompt
+from .models import (
+    FunctionCall,
+    FunctionDefinition,
+    TestPrompt,
+    parse_function_definitions,
+    parse_test_prompts,
+)
 from .parameter_parser import ParameterParser
 
 DEFAULT_FUNCTIONS_PATH = Path("data/input/functions_definition.json")
@@ -91,11 +98,40 @@ def save_json(path: Path, data: list[dict[str, Any]]) -> None:
         )
 
 
+def _format_error(exc: ValueError) -> str:
+    """Turn an exception into a short, user-facing message.
+
+    ``pydantic.ValidationError`` prints a verbose multi-line block
+    (including a link to its docs) by default, which is not something
+    an end user running this CLI needs to see. This collapses it down
+    to ``"<field>: <reason>"`` pairs; any other ``ValueError`` is
+    returned as-is.
+    """
+    if isinstance(exc, ValidationError):
+        details = "; ".join(
+            f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: "
+            f"{error['msg']}"
+            for error in exc.errors()
+        )
+        return details
+
+    return str(exc)
+
+
 def load_input_files(
     functions_path: Path,
     prompts_path: Path,
 ) -> tuple[list[FunctionDefinition], list[TestPrompt]]:
     """Load and validate both input files, failing gracefully.
+
+    All schema validation (missing/extra keys, disallowed parameter
+    types, empty prompts, empty function names, ...) is delegated to
+    ``models.parse_function_definitions`` and
+    ``models.parse_test_prompts``, both of which only ever raise
+    ``ValueError`` (``pydantic.ValidationError`` is a ``ValueError``
+    subclass) for anything that doesn't match the expected schema.
+    This function therefore only needs to worry about file-system and
+    JSON-syntax errors on top of that single exception type.
 
     Parameters
     ----------
@@ -111,33 +147,34 @@ def load_input_files(
     """
     try:
         functions_data = load_json(functions_path)
-        functions = [FunctionDefinition(**item) for item in functions_data]
+        functions = parse_function_definitions(functions_data, str(functions_path))
     except FileNotFoundError:
         print(f"Error: functions definition file not found: {functions_path}")
         sys.exit(1)
     except json.JSONDecodeError as exc:
         print(f"Error: invalid JSON in {functions_path}: {exc}")
         sys.exit(1)
-    except (TypeError, ValueError) as exc:
+    except ValueError as exc:
         print(
             f"Error: {functions_path} "
-            f"does not match the expected schema: {exc}"
-            )
+            f"does not match the expected schema: {_format_error(exc)}"
+        )
         sys.exit(1)
 
     try:
         prompts_data = load_json(prompts_path)
-        prompts = [TestPrompt(**item) for item in prompts_data]
+        prompts = parse_test_prompts(prompts_data, str(prompts_path))
     except FileNotFoundError:
         print(f"Error: prompts file not found: {prompts_path}")
         sys.exit(1)
     except json.JSONDecodeError as exc:
         print(f"Error: invalid JSON in {prompts_path}: {exc}")
         sys.exit(1)
-    except (TypeError, ValueError) as exc:
+    except ValueError as exc:
         print(
-            f"Error: {prompts_path} does not match the expected schema: {exc}"
-            )
+            f"Error: {prompts_path} does not match the expected schema: "
+            f"{_format_error(exc)}"
+        )
         sys.exit(1)
 
     return functions, prompts
@@ -148,14 +185,15 @@ def main() -> None:
     args = my_parse_args()
 
     start_time = time.perf_counter()
-    print("Loading model...")
-    model = Small_LLM_Model()
 
     print("Loading functions and prompts...")
     functions, prompts = load_input_files(
         args.functions_definition,
         args.input,
     )
+
+    print("Loading model...")
+    model = Small_LLM_Model()
 
     registry = FunctionRegistry(functions, model)
     decoder = Decoder(registry)
