@@ -84,11 +84,11 @@ class ParameterParser:
                 raw_value = self._generate_boolean(context)
                 context += raw_value
             elif param_type in ("number", "integer"):
-                raw_value = self._generate_number(context)
+                raw_value = self._generate_number(context, prompt)
                 context += raw_value
             else:
                 context += '"'
-                raw_value = self._generate_string(context)
+                raw_value = self._generate_string(context, prompt)
                 context += raw_value + '"'
 
             if not raw_value:
@@ -115,16 +115,18 @@ class ParameterParser:
             f'{{"name": "{function.name}", "parameters": {{'
         )
 
-    def _generate_number(self, context: str) -> str:
+    def _generate_number(self, context: str, prompt: str) -> str:
         """Generate a numeric literal continuing ``context``."""
+        prompt_len = len(prompt)
         allowed_ids = self._get_number_token_ids()
-        return self._generate_constrained(context, allowed_ids)
+        return self._generate_constrained(context, allowed_ids, prompt_len)
 
-    def _generate_string(self, context: str) -> str:
+    def _generate_string(self, context: str, prompt: str) -> str:
         """Generate a string's contents (without the wrapping quotes,
         which the caller adds) continuing ``context``."""
+        prompt_len = len(prompt)
         allowed_ids = self._get_string_token_ids()
-        return self._generate_constrained(context, allowed_ids)
+        return self._generate_constrained(context, allowed_ids, prompt_len)
 
     def _generate_boolean(self, context: str) -> str:
         """Pick whichever of 'true'/'false' scores higher as the next
@@ -143,6 +145,7 @@ class ParameterParser:
         self,
         context: str,
         allowed_token_ids: np.ndarray,
+        max_tokens: int
     ) -> str:
         """Greedily generate a value continuing ``context``, one token
         at a time, taking the highest-scoring token that is allowed for
@@ -151,7 +154,7 @@ class ParameterParser:
         value_text = ""
         allowed_set = set(int(i) for i in allowed_token_ids)
 
-        for _ in range(self._MAX_VALUE_TOKENS):
+        for _ in range(max_tokens):
             prompt_ids = self._model.encode(context + value_text)[0].tolist()
             logits = np.array(
                 self._model.get_logits_from_input_ids(prompt_ids)

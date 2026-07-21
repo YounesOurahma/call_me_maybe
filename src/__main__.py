@@ -18,7 +18,7 @@ DEFAULT_PROMPTS_PATH = Path("data/input/function_calling_tests.json")
 DEFAULT_OUTPUT_PATH = Path("data/output/function_calling_results.json")
 
 
-def parse_args() -> argparse.Namespace:
+def my_parse_args() -> argparse.Namespace:
     """Parse command-line arguments.
 
     Returns
@@ -27,26 +27,21 @@ def parse_args() -> argparse.Namespace:
         Parsed arguments with ``functions_definition``, ``input``,
         and ``output`` attributes.
     """
-    parser = argparse.ArgumentParser(
-        description="Translate natural-language prompts into function calls.",
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--functions_definition",
         type=Path,
         default=DEFAULT_FUNCTIONS_PATH,
-        help="Path to the JSON file describing available functions.",
     )
     parser.add_argument(
         "--input",
         type=Path,
         default=DEFAULT_PROMPTS_PATH,
-        help="Path to the JSON file containing test prompts.",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=DEFAULT_OUTPUT_PATH,
-        help="Path where the resulting JSON file will be written.",
     )
     return parser.parse_args()
 
@@ -150,7 +145,7 @@ def load_input_files(
 
 def main() -> None:
     """Run the full function-calling pipeline end to end."""
-    args = parse_args()
+    args = my_parse_args()
 
     start_time = time.perf_counter()
     print("Loading model...")
