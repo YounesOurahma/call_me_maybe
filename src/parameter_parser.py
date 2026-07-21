@@ -153,14 +153,13 @@ class ParameterParser:
 
         for _ in range(self._MAX_VALUE_TOKENS):
             prompt_ids = self._model.encode(context + value_text)[0].tolist()
-            logits = np.asarray(
-                self._model.get_logits_from_input_ids(prompt_ids),
-                dtype=np.float32,
+            logits = np.array(
+                self._model.get_logits_from_input_ids(prompt_ids)
             )
 
             best_overall = int(np.argmax(logits))
 
-            masked = np.full(logits.shape, -np.inf, dtype=np.float32)
+            masked = np.full(logits.shape, -np.inf)
             masked[allowed_token_ids] = logits[allowed_token_ids]
             best_allowed = int(np.argmax(masked))
 
@@ -212,7 +211,7 @@ class ParameterParser:
             if text and text_is_allowed(text):
                 allowed_ids.append(token_id)
 
-        return np.fromiter(allowed_ids, dtype=np.int64)
+        return np.array(allowed_ids)
 
     def _token_text(self, token_id: int) -> str:
         """Decode a single token id, caching the result for reuse."""
