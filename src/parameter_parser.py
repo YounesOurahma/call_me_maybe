@@ -5,17 +5,17 @@ from .models import FunctionDefinition
 
 _NUMBER_CHARACTERS = set("0123456789.- ")
 
-_TYPE_ALIASES: Dict[str, str] = {
-    "str": "string",
-    "string": "string",
-    "int": "integer",
-    "integer": "integer",
-    "float": "number",
-    "double": "number",
-    "number": "number",
-    "bool": "boolean",
-    "boolean": "boolean",
-}
+# _TYPE_ALIASES: Dict[str, str] = {
+#     "str": "string",
+#     "string": "string",
+#     "int": "integer",
+#     "integer": "integer",
+#     "float": "number",
+#     "double": "number",
+#     "number": "number",
+#     "bool": "boolean",
+#     "boolean": "boolean",
+# }
 
 
 class ParameterParser:
@@ -77,7 +77,7 @@ class ParameterParser:
         items = list(function.parameters.items())
 
         for index, (name, definition) in enumerate(items):
-            param_type = self._normalize_type(definition.type)
+            param_type = definition.type
             context += f'"{name}": '
 
             if param_type == "boolean":
@@ -240,16 +240,16 @@ class ParameterParser:
 
         return bool(stack)
 
-    def _normalize_type(self, parameter_type: str) -> str:
-        """Map a schema type name onto one of the four supported types."""
-        normalized = _TYPE_ALIASES.get(parameter_type.lower())
+    # def _normalize_type(self, parameter_type: str) -> str:
+    #     """Map a schema type name onto one of the four supported types."""
+    #     normalized = _TYPE_ALIASES.get(parameter_type.lower())
 
-        if normalized is None:
-            raise ValueError(
-                f"Unsupported parameter type: {parameter_type!r}"
-            )
+    #     if normalized is None:
+    #         raise ValueError(
+    #             f"Unsupported parameter type: {parameter_type!r}"
+    #         )
 
-        return normalized
+    #     return normalized
 
     def _convert(self, raw_value: str, param_type: str, name: str) -> Any:
         """Convert the generated text into the correctly typed value."""
