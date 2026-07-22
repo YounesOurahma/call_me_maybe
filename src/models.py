@@ -95,7 +95,6 @@ class FunctionDefinition(BaseModel):
                     "empty name."
                 )
         return self
-<<<<<<< HEAD
 
     def __str__(self):
         """Return a human-readable function prototype string."""
@@ -103,9 +102,6 @@ class FunctionDefinition(BaseModel):
             f"{k}: {v.type}" for k, v in self.parameters.items()
         )
         return f"prototype: def {self.name}({params}) -> {self.returns.type}"
-=======
->>>>>>> refs/remotes/origin/main
-
 
 class TestPrompt(BaseModel):
     """Represents a single prompt from the input tests file."""

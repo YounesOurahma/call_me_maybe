@@ -46,7 +46,7 @@ class Decoder:
             for function in self._functions
         ]
 
-        self._header_ids = self._build_header()
+        self._instruction_ids = self._build_instructions()
 
     def select(self, prompt: str) -> FunctionDefinition:
         """Select the function that best matches ``prompt``.
@@ -68,9 +68,9 @@ class Decoder:
             sequence generated so far.
         """
         prompt_ids = (
-            self._header_ids
-            + self._model.encode(prompt)[0].tolist()
-            + self._model.encode('\n{"name": "')[0].tolist()
+            self._model.encode(f"Request: {prompt}")[0].tolist()
+            + self._instruction_ids
+            + self._model.encode(f'\nRequest: {prompt}\n{{"name": "')[0].tolist()
         )
 
         generated: List[int] = []
@@ -149,15 +149,18 @@ class Decoder:
 
         return None
 
-    def _build_header(self) -> List[int]:
+    def _build_instructions(self) -> List[int]:
         """
         Encode the static part of the prompt: instructions plus the
         full catalog of available functions. Computed once and reused
         for every call to :py:meth:`select`.
         """
-        lines = ["Select the best matching function.",
-                 "",
-                 "Available functions:"]
+        lines = [
+            "",
+            "Select the best matching function.",
+            "",
+            "Available functions:"
+        ]
 
         for function in self._functions:
             lines.append(function.name)
@@ -169,8 +172,6 @@ class Decoder:
                     lines.append(f"- {name}: {parameter.type}")
 
             lines.append("")
-
-        lines.append("Request: ")
 
         text = "\n".join(lines)
 

@@ -5,18 +5,6 @@ from .models import FunctionDefinition
 
 _NUMBER_CHARACTERS = set("0123456789.- ")
 
-# _TYPE_ALIASES: Dict[str, str] = {
-#     "str": "string",
-#     "string": "string",
-#     "int": "integer",
-#     "integer": "integer",
-#     "float": "number",
-#     "double": "number",
-#     "number": "number",
-#     "bool": "boolean",
-#     "boolean": "boolean",
-# }
-
 
 class ParameterParser:
     """Fills a function's parameters by continuing a JSON object.
@@ -239,17 +227,6 @@ class ParameterParser:
                     stack.pop()
 
         return bool(stack)
-
-    # def _normalize_type(self, parameter_type: str) -> str:
-    #     """Map a schema type name onto one of the four supported types."""
-    #     normalized = _TYPE_ALIASES.get(parameter_type.lower())
-
-    #     if normalized is None:
-    #         raise ValueError(
-    #             f"Unsupported parameter type: {parameter_type!r}"
-    #         )
-
-    #     return normalized
 
     def _convert(self, raw_value: str, param_type: str, name: str) -> Any:
         """Convert the generated text into the correctly typed value."""
