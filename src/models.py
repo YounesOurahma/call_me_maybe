@@ -96,13 +96,6 @@ class FunctionDefinition(BaseModel):
                 )
         return self
 
-    def __str__(self):
-        """Return a human-readable function prototype string."""
-        params = ", ".join(
-            f"{k}: {v.type}" for k, v in self.parameters.items()
-        )
-        return f"prototype: def {self.name}({params}) -> {self.returns.type}"
-
 class TestPrompt(BaseModel):
     """Represents a single prompt from the input tests file."""
 
