@@ -9,8 +9,6 @@ from llm_sdk import Small_LLM_Model
 from pydantic import ValidationError
 
 from .decoder import Decoder
-from .function_registry import FunctionRegistry
-from .generator import Generator
 from .models import (
     FunctionCall,
     FunctionDefinition,
@@ -195,9 +193,7 @@ def main() -> None:
     print("Loading model...")
     model = Small_LLM_Model()
 
-    registry = FunctionRegistry(functions, model)
-    decoder = Decoder(registry)
-    generator = Generator(model, decoder, registry)
+    decoder = Decoder(functions, model)
     parser = ParameterParser(model)
 
     results: list[dict[str, Any]] = []
@@ -209,7 +205,7 @@ def main() -> None:
         print(f"[{index}/{len(prompts)}] {test.prompt}")
 
         try:
-            function = generator.generate(test.prompt)
+            function = decoder.select(test.prompt)
             parameters = parser.parse(test.prompt, function)
 
             result = FunctionCall(
