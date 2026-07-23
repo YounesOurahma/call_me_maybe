@@ -40,7 +40,6 @@ class Decoder:
         self._functions = list(functions)
         self._model = model
 
-        # Every candidate function name, pre-encoded exactly once.
         self._candidates: List[Tuple[int, ...]] = [
             tuple(model.encode(function.name)[0].tolist())
             for function in self._functions
@@ -72,7 +71,7 @@ class Decoder:
             + self._instruction_ids
             + self._model.encode(f'\nRequest: {prompt}\n{{"name": "')[0].tolist()
         )
-
+            
         generated: List[int] = []
 
         while True:
@@ -115,11 +114,11 @@ class Decoder:
         """
         allowed = self._allowed_next_tokens(generated)
 
-        logits_array = np.asarray(logits, dtype=np.float32)
-        masked = np.full(logits_array.shape, -np.inf, dtype=np.float32)
+        logits_array = np.array(logits)
+        masked = np.full(logits_array.shape, -np.inf)
 
         if allowed:
-            indices = np.fromiter(allowed, dtype=np.int64)
+            indices = np.array(list(allowed))
             masked[indices] = logits_array[indices]
 
         return masked
