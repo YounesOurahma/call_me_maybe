@@ -71,7 +71,7 @@ class Decoder:
             + self._instruction_ids
             + self._model.encode(f'\nRequest: {prompt}\n{{"name": "')[0].tolist()
         )
-            
+
         generated: List[int] = []
 
         while True:

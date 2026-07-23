@@ -18,7 +18,6 @@ class ParameterParser:
     """
 
     _BOOLEAN_CANDIDATES = ("true", "false")
-    _MAX_VALUE_TOKENS = 30
     _OPENERS = "([{"
     _CLOSERS_TO_OPENERS = {")": "(", "]": "[", "}": "{"}
 
@@ -166,7 +165,7 @@ class ParameterParser:
 
             value_text += piece
 
-        return value_text.strip()
+        return value_text.strip().strip(';')
 
     def _get_number_token_ids(self) -> np.ndarray:
         """Return (building and caching, on first use) every token id
