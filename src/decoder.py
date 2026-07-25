@@ -41,7 +41,7 @@ class Decoder:
         self._model = model
 
         self._candidates: List[Tuple[int, ...]] = [
-            tuple(model.encode(function.name)[0].tolist())
+            tuple(model.encode(f'"{function.name}",')[0].tolist())
             for function in self._functions
         ]
 

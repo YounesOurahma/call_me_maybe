@@ -184,8 +184,6 @@ def main() -> None:
     """Run the full function-calling pipeline end to end."""
     args = my_parse_args()
 
-    start_time = time.perf_counter()
-
     print("Loading functions and prompts...")
     functions, prompts = load_input_files(
         args.functions_definition,
@@ -194,6 +192,7 @@ def main() -> None:
 
     print("Loading model...")
     model = Small_LLM_Model()
+    start_time = time.perf_counter()
 
     decoder = Decoder(functions, model)
     parser = ParameterParser(model)

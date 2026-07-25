@@ -153,7 +153,13 @@ def parse_function_definitions(
             f"{source} must contain at least one function definition."
         )
 
-    return [FunctionDefinition.model_validate(item) for item in data]
+    functions = [FunctionDefinition.model_validate(item) for item in data]
+    functions_names = [function.name for function in functions]
+    if len(set(functions_names)) < len(functions_names):
+        raise ValueError(
+            "Can't accept duplicated functions."
+        )
+    return functions
 
 
 def parse_test_prompts(data: Any, source: str) -> List[TestPrompt]:
