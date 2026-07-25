@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Literal
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-ALLOWED_PARAMETER_TYPES = ("string", "number", "boolean", "integer")
 
 _FUNCTION_DEFINITION_REQUIRED_KEYS = {
     "name",
@@ -96,6 +95,7 @@ class FunctionDefinition(BaseModel):
                 )
         return self
 
+
 class TestPrompt(BaseModel):
     """Represents a single prompt from the input tests file."""
 
@@ -121,7 +121,8 @@ class FunctionCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def parse_function_definitions(data: Any, source: str) -> List[FunctionDefinition]:
+def parse_function_definitions(
+        data: Any, source: str) -> List[FunctionDefinition]:
     """Validate and build every ``FunctionDefinition`` found in ``data``.
 
     Parameters

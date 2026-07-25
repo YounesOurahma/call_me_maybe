@@ -145,7 +145,9 @@ def load_input_files(
     """
     try:
         functions_data = load_json(functions_path)
-        functions = parse_function_definitions(functions_data, str(functions_path))
+        functions = parse_function_definitions(
+            functions_data, str(functions_path)
+            )
     except FileNotFoundError:
         print(f"Error: functions definition file not found: {functions_path}")
         sys.exit(1)

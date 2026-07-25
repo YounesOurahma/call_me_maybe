@@ -69,7 +69,8 @@ class Decoder:
         prompt_ids = (
             self._model.encode(f"Request: {prompt}")[0].tolist()
             + self._instruction_ids
-            + self._model.encode(f'\nRequest: {prompt}\n{{"name": "')[0].tolist()
+            + self._model.encode(
+                f'\nRequest: {prompt}\n{{"name": "')[0].tolist()
         )
 
         generated: List[int] = []
