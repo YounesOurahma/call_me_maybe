@@ -106,8 +106,7 @@ def _format_error(exc: ValueError) -> str:
     returned as-is.
     """
     if isinstance(exc, ValidationError):
-        details = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: "
+        details = "\n".join(
             f"{error['msg']}"
             for error in exc.errors()
         )
