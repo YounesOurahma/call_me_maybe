@@ -19,18 +19,6 @@ class Decoder:
     ) -> None:
         """Store the function catalog and pre-encode everything that
         does not depend on the prompt.
-
-        Parameters
-        ----------
-        functions:
-            Every function the model is allowed to select from.
-        model:
-            The language model used for both scoring and generation.
-
-        Raises
-        ------
-        ValueError
-            If ``functions`` is empty.
         """
         if not functions:
             raise ValueError(
@@ -49,22 +37,6 @@ class Decoder:
 
     def select(self, prompt: str) -> FunctionDefinition:
         """Select the function that best matches ``prompt``.
-
-        Parameters
-        ----------
-        prompt:
-            Natural language user request.
-
-        Returns
-        -------
-        FunctionDefinition
-            The selected function.
-
-        Raises
-        ------
-        RuntimeError
-            If no registered function name can legally continue the
-            sequence generated so far.
         """
         prompt_ids = (
             self._model.encode(f"Request: {prompt}")[0].tolist()
@@ -99,19 +71,6 @@ class Decoder:
         """
         Mask every token that cannot continue ``generated`` as a
         prefix of at least one registered function name.
-
-        Parameters
-        ----------
-        generated:
-            Tokens generated so far.
-        logits:
-            Raw logits returned by the language model.
-
-        Returns
-        -------
-        np.ndarray
-            A masked logits vector where every forbidden token has
-            value ``-np.inf``.
         """
         allowed = self._allowed_next_tokens(generated)
 

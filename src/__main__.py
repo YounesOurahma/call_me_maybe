@@ -25,12 +25,6 @@ DEFAULT_OUTPUT_PATH = Path("data/output/function_calling_results.json")
 
 def my_parse_args() -> argparse.Namespace:
     """Parse command-line arguments.
-
-    Returns
-    -------
-    argparse.Namespace
-        Parsed arguments with ``functions_definition``, ``input``,
-        and ``output`` attributes.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -53,23 +47,6 @@ def my_parse_args() -> argparse.Namespace:
 
 def load_json(path: Path) -> list[Any]:
     """Load a JSON array from disk.
-
-    Parameters
-    ----------
-    path:
-        Path to the JSON file to load.
-
-    Returns
-    -------
-    list[Any]
-        The parsed JSON content.
-
-    Raises
-    ------
-    FileNotFoundError
-        If ``path`` does not exist.
-    json.JSONDecodeError
-        If ``path`` does not contain valid JSON.
     """
     with path.open("r", encoding="utf-8") as file:
         return cast(list[Any], json.load(file))
@@ -77,13 +54,6 @@ def load_json(path: Path) -> list[Any]:
 
 def save_json(path: Path, data: list[dict[str, Any]]) -> None:
     """Write a list of dictionaries to disk as a JSON array.
-
-    Parameters
-    ----------
-    path:
-        Destination path. Parent directories are created if needed.
-    data:
-        The list of dictionaries to serialize.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -91,19 +61,12 @@ def save_json(path: Path, data: list[dict[str, Any]]) -> None:
         json.dump(
             data,
             file,
-            indent=4,
-            ensure_ascii=False,
+            indent=4
         )
 
 
 def _format_error(exc: ValueError) -> str:
     """Turn an exception into a short, user-facing message.
-
-    ``pydantic.ValidationError`` prints a verbose multi-line block
-    (including a link to its docs) by default, which is not something
-    an end user running this CLI needs to see. This collapses it down
-    to ``"<field>: <reason>"`` pairs; any other ``ValueError`` is
-    returned as-is.
     """
     if isinstance(exc, ValidationError):
         details = "\n".join(
@@ -120,27 +83,6 @@ def load_input_files(
     prompts_path: Path,
 ) -> tuple[list[FunctionDefinition], list[TestPrompt]]:
     """Load and validate both input files, failing gracefully.
-
-    All schema validation (missing/extra keys, disallowed parameter
-    types, empty prompts, empty function names, ...) is delegated to
-    ``models.parse_function_definitions`` and
-    ``models.parse_test_prompts``, both of which only ever raise
-    ``ValueError`` (``pydantic.ValidationError`` is a ``ValueError``
-    subclass) for anything that doesn't match the expected schema.
-    This function therefore only needs to worry about file-system and
-    JSON-syntax errors on top of that single exception type.
-
-    Parameters
-    ----------
-    functions_path:
-        Path to the function catalog JSON file.
-    prompts_path:
-        Path to the test prompts JSON file.
-
-    Returns
-    -------
-    tuple[list[FunctionDefinition], list[TestPrompt]]
-        The parsed functions and prompts.
     """
     try:
         functions_data = load_json(functions_path)
@@ -200,10 +142,7 @@ def main() -> None:
 
     print("Running inference...")
 
-    for index, test in enumerate(prompts, start=1):
-
-        print(f"[{index}/{len(prompts)}] {test.prompt}")
-
+    for test in prompts:
         try:
             function = decoder.select(test.prompt)
             parameters = parser.parse(test.prompt, function)
@@ -213,7 +152,12 @@ def main() -> None:
                 name=function.name,
                 parameters=parameters,
             )
-
+            print("Generated: {name:",
+                  f"{function.name}",
+                  "},",
+                  "{Pamaraters:",
+                  f"{parameters}",
+                  "}.")
             results.append(result.model_dump())
 
         except Exception as exc:

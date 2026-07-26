@@ -12,10 +12,6 @@ _FUNCTION_DEFINITION_REQUIRED_KEYS = {
 
 class ParameterDef(BaseModel):
     """Represents the declared type of a single parameter or return value.
-
-    ``type`` is restricted to exactly the four supported values; any
-    other value (including case variants or aliases like ``"str"`` /
-    ``"float"``) is rejected at parse time.
     """
 
     type: Literal["string", "number", "boolean", "integer"]
@@ -25,11 +21,6 @@ class ParameterDef(BaseModel):
 
 class FunctionDefinition(BaseModel):
     """Represents a single function the system is allowed to call.
-
-    A function definition must contain exactly the four keys ``name``,
-    ``description``, ``parameters`` and ``returns`` -- nothing more,
-    nothing less. Missing or extra keys are rejected with a precise
-    error message.
     """
 
     name: str
@@ -118,30 +109,10 @@ class FunctionCall(BaseModel):
     name: str
     parameters: Dict[str, Any]
 
-    model_config = ConfigDict(extra="forbid")
-
 
 def parse_function_definitions(
         data: Any, source: str) -> List[FunctionDefinition]:
     """Validate and build every ``FunctionDefinition`` found in ``data``.
-
-    Parameters
-    ----------
-    data:
-        The raw JSON content already loaded from ``source``.
-    source:
-        A human-readable label for the origin of ``data``, used only to
-        build clear error messages (e.g. the file path).
-
-    Returns
-    -------
-    list[FunctionDefinition]
-
-    Raises
-    ------
-    ValueError
-        If ``data`` is not a non-empty JSON array of valid function
-        definitions.
     """
     if not isinstance(data, list):
         raise ValueError(
@@ -164,23 +135,6 @@ def parse_function_definitions(
 
 def parse_test_prompts(data: Any, source: str) -> List[TestPrompt]:
     """Validate and build every ``TestPrompt`` found in ``data``.
-
-    Parameters
-    ----------
-    data:
-        The raw JSON content already loaded from ``source``.
-    source:
-        A human-readable label for the origin of ``data``, used only to
-        build clear error messages (e.g. the file path).
-
-    Returns
-    -------
-    list[TestPrompt]
-
-    Raises
-    ------
-    ValueError
-        If ``data`` is not a non-empty JSON array of valid prompts.
     """
     if not isinstance(data, list):
         raise ValueError(f"{source} must contain a JSON array of prompts.")
