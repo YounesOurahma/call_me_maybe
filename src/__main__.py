@@ -101,6 +101,9 @@ def load_input_files(
             f"does not match the expected schema: {_format_error(exc)}"
         )
         sys.exit(1)
+    except OSError as exc:
+        print(f"Error: could not read {functions_path}: {exc}")
+        sys.exit(1)
 
     try:
         prompts_data = load_json(prompts_path)
@@ -116,6 +119,9 @@ def load_input_files(
             f"Error: {prompts_path} does not match the expected schema: "
             f"{_format_error(exc)}"
         )
+        sys.exit(1)
+    except OSError as exc:
+        print(f"Error: could not read {prompts_path}: {exc}")
         sys.exit(1)
 
     return functions, prompts
@@ -190,4 +196,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print(f"Error: {exc}")
