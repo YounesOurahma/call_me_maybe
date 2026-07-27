@@ -64,6 +64,7 @@ class FunctionDefinition(BaseModel):
     @field_validator("name")
     @classmethod
     def name_must_not_be_empty(cls, value: str) -> str:
+        """Checks if the name is empty."""
         if not value.strip():
             raise ValueError("Function 'name' must not be empty.")
         return value
@@ -71,6 +72,7 @@ class FunctionDefinition(BaseModel):
     @field_validator("description")
     @classmethod
     def description_must_not_be_empty(cls, value: str) -> str:
+        """Checks if the description is empty."""
         if not value.strip():
             raise ValueError("Function 'description' must not be empty.")
         return value
@@ -97,6 +99,7 @@ class TestPrompt(BaseModel):
     @field_validator("prompt")
     @classmethod
     def prompt_must_not_be_empty(cls, value: str) -> str:
+        """Checks if the prompt is empty."""
         if not value.strip():
             raise ValueError("'prompt' must not be empty.")
         return value
