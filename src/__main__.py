@@ -161,13 +161,19 @@ def main() -> None:
             results.append(result.model_dump())
 
         except Exception as exc:
-            print(f"Failed on prompt: {test.prompt}")
-            results.append(
-                {
-                    "prompt": test.prompt,
-                    "error": str(exc),
-                }
+            default_values = parser.default_parameters(function)
+            result = FunctionCall(
+                prompt=test.prompt,
+                name=function.name,
+                parameters=default_values,
             )
+            print("Generated: {name:",
+                f"{function.name}",
+                "},",
+                "{Pamaraters:",
+                f"{default_values}",
+                "}.")
+            results.append(result.model_dump())
 
     print("Saving output...")
 

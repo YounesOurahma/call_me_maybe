@@ -5,6 +5,12 @@ from .models import FunctionDefinition
 
 _NUMBER_CHARACTERS = set("0123456789.- ")
 
+_DEFAULT_VALUES: Dict[str, Any] = {
+    "boolean": False,
+    "integer": 0,
+    "number": 0.0,
+    "string": "Null_value",
+}
 
 class ParameterParser:
     """Fills a function's parameters by continuing a JSON object.
@@ -49,9 +55,7 @@ class ParameterParser:
                 context += raw_value + '"'
 
             if not raw_value:
-                raise ValueError(
-                    f"Unable to extract value for parameter {name!r}."
-                )
+                raise ValueError()
 
             parameters[name] = self._convert(raw_value, param_type, name)
 
@@ -197,6 +201,16 @@ class ParameterParser:
 
         return bool(stack)
 
+
+    def default_parameters(self, function: FunctionDefinition) -> Dict[str, Any]:
+        """Type-correct placeholder parameters for every parameter of
+        ``function``, with no attempt at extraction.
+        """
+        return {
+            name: _DEFAULT_VALUES[definition.type]
+            for name, definition in function.parameters.items()
+        }
+
     def _convert(self, raw_value: str, param_type: str, name: str) -> Any:
         """Convert the generated text into the correctly typed value."""
         try:
@@ -207,8 +221,5 @@ class ParameterParser:
             if param_type == "number":
                 return float(raw_value.replace(" ", ""))
             return raw_value.strip()
-        except ValueError as exc:
-            raise ValueError(
-                f"Could not convert value {raw_value!r} for parameter "
-                f"{name!r} to type {param_type!r}"
-            ) from exc
+        except ValueError:
+            raise ValueError()
