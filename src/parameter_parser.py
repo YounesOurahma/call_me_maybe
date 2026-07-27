@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 import numpy as np
 from llm_sdk import Small_LLM_Model
 from .models import FunctionDefinition
@@ -11,6 +11,7 @@ _DEFAULT_VALUES: Dict[str, Any] = {
     "number": 0.0,
     "string": "Null_value",
 }
+
 
 class ParameterParser:
     """Fills a function's parameters by continuing a JSON object.
@@ -175,7 +176,7 @@ class ParameterParser:
             if text and text_is_allowed(text):
                 allowed_ids.append(token_id)
 
-        return np.array(allowed_ids)
+        return cast(np.ndarray, np.array(allowed_ids))
 
     def _token_text(self, token_id: int) -> str:
         """Decode a single token id, caching the result for reuse."""
@@ -201,8 +202,8 @@ class ParameterParser:
 
         return bool(stack)
 
-
-    def default_parameters(self, function: FunctionDefinition) -> Dict[str, Any]:
+    def default_parameters(
+            self, function: FunctionDefinition) -> Dict[str, Any]:
         """Type-correct placeholder parameters for every parameter of
         ``function``, with no attempt at extraction.
         """

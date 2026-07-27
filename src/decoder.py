@@ -1,4 +1,4 @@
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple, cast
 
 import numpy as np
 
@@ -81,7 +81,7 @@ class Decoder:
             indices = np.array(list(allowed))
             masked[indices] = logits_array[indices]
 
-        return masked
+        return cast(np.ndarray, masked)
 
     def _allowed_next_tokens(self, generated: List[int]) -> Set[int]:
         """Every token id that keeps ``generated`` a valid, not-yet-
@@ -134,4 +134,4 @@ class Decoder:
 
         text = "\n".join(lines)
 
-        return self._model.encode(text)[0].tolist()
+        return cast(List[int], self._model.encode(text)[0].tolist())
