@@ -47,12 +47,12 @@ def my_parse_args() -> argparse.Namespace:
 
 def error_on_duplicates_identifier(pairs):
     seen = set()
-    for key in pairs:
+    for key, value in pairs:
         if key in seen:
             raise ValueError(f"Duplicate key detected: {key}")
         if not str(key).isidentifier():
             raise ValueError(
-                f"Invalid python identifier {key}."
+                f"Invalid python identifier {key}: {value}."
             )
         seen.add(key)
     return dict(pairs)
