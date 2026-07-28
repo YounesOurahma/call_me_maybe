@@ -10,8 +10,8 @@ debug:
 	uv run python -m pdb -m src
 
 clean:
-	find src -type d -name "__pycache__" -exec rm -rf {} +
-	find src -type f -name "*.pyc" -delete
+	find -type d -name "__pycache__" -exec rm -rf {} +
+	find -type f -name "*.pyc" -delete
 	rm -rf .mypy_cache
 	rm -rf .pytest_cache
 	rm -rf .venv
