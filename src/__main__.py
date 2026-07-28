@@ -56,7 +56,7 @@ def error_on_duplicates_identifier(
                 f"Invalid python identifier {key}: {value}."
             )
         seen.add(key)
-    return Dict(pairs)
+    return dict(pairs)
 
 
 def load_json(path: Path) -> List[Any]:
