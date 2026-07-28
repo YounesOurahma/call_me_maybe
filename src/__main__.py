@@ -45,11 +45,27 @@ def my_parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def error_on_duplicates_identifier(pairs):
+    seen = set()
+    for key in pairs:
+        if key in seen:
+            raise ValueError(f"Duplicate key detected: {key}")
+        if not str(key).isidentifier():
+            raise ValueError(
+                f"Invalid python identifier {key}."
+            )
+        seen.add(key)
+    return dict(pairs)
+
+
 def load_json(path: Path) -> list[Any]:
     """Load a JSON array from disk.
     """
     with path.open("r", encoding="utf-8") as file:
-        return cast(list[Any], json.load(file))
+        return cast(
+            list[Any], json.load(
+                file, object_pairs_hook=error_on_duplicates_identifier)
+                )
 
 
 def save_json(path: Path, data: list[dict[str, Any]]) -> None:
@@ -161,7 +177,7 @@ def main() -> None:
             print("Generated: {name:",
                   f"{function.name}",
                   "},",
-                  "{Pamaraters:",
+                  "{Parameters:",
                   f"{parameters}",
                   "}.")
             results.append(result.model_dump())
@@ -176,7 +192,7 @@ def main() -> None:
             print("Generated: {name:",
                   f"{function.name}",
                   "},",
-                  "{Pamaraters:",
+                  "{Parameters:",
                   f"{default_values}",
                   "}.")
             results.append(result.model_dump())
