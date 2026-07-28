@@ -3,7 +3,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Tuple, List, Dict
 
 from llm_sdk import Small_LLM_Model
 from pydantic import ValidationError
@@ -45,7 +45,8 @@ def my_parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def error_on_duplicates_identifier(pairs):
+def error_on_duplicates_identifier(
+        pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
     seen = set()
     for key, value in pairs:
         if key in seen:
@@ -55,20 +56,20 @@ def error_on_duplicates_identifier(pairs):
                 f"Invalid python identifier {key}: {value}."
             )
         seen.add(key)
-    return dict(pairs)
+    return Dict(pairs)
 
 
-def load_json(path: Path) -> list[Any]:
+def load_json(path: Path) -> List[Any]:
     """Load a JSON array from disk.
     """
     with path.open("r", encoding="utf-8") as file:
         return cast(
-            list[Any], json.load(
+            List[Any], json.load(
                 file, object_pairs_hook=error_on_duplicates_identifier)
                 )
 
 
-def save_json(path: Path, data: list[dict[str, Any]]) -> None:
+def save_json(path: Path, data: List[Dict[str, Any]]) -> None:
     """Write a list of dictionaries to disk as a JSON array.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -97,7 +98,7 @@ def _format_error(exc: ValueError) -> str:
 def load_input_files(
     functions_path: Path,
     prompts_path: Path,
-) -> tuple[list[FunctionDefinition], list[TestPrompt]]:
+) -> Tuple[List[FunctionDefinition], List[TestPrompt]]:
     """Load and validate both input files, failing gracefully.
     """
     try:
@@ -160,7 +161,7 @@ def main() -> None:
     decoder = Decoder(functions, model)
     parser = ParameterParser(model)
 
-    results: list[dict[str, Any]] = []
+    results: List[Dict[str, Any]] = []
 
     print("Running inference...")
 
