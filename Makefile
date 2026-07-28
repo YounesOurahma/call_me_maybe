@@ -1,7 +1,5 @@
 .PHONY: all install run debug clean lint lint-strict
 
-all: install
-
 install:
 	uv sync
 
