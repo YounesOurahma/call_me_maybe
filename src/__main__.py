@@ -50,11 +50,7 @@ def error_on_duplicates_identifier(
     seen = set()
     for key, value in pairs:
         if key in seen:
-            raise ValueError(f"Duplicate key detected: {key}")
-        if not str(key).isidentifier():
-            raise ValueError(
-                f"Invalid python identifier {key}: {value}."
-            )
+            raise ValueError(f"Duplicate key detected: {key}: {value}")
         seen.add(key)
     return dict(pairs)
 

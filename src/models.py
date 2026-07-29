@@ -127,11 +127,6 @@ def parse_function_definitions(
         )
 
     functions = [FunctionDefinition.model_validate(item) for item in data]
-    for function in functions:
-        if not function.name.isidentifier():
-            raise ValueError(
-                f"Invalid identifier name {function.name}"
-            )
     functions_names = [function.name for function in functions]
     if len(set(functions_names)) < len(functions_names):
         raise ValueError(
