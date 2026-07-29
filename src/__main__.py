@@ -45,8 +45,9 @@ def my_parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def error_on_duplicates_identifier(
+def error_on_duplicates(
         pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
+    """Validate the duplication of paramaters"""
     seen = set()
     for key, value in pairs:
         if key in seen:
@@ -61,7 +62,7 @@ def load_json(path: Path) -> List[Any]:
     with path.open("r", encoding="utf-8") as file:
         return cast(
             List[Any], json.load(
-                file, object_pairs_hook=error_on_duplicates_identifier)
+                file, object_pairs_hook=error_on_duplicates)
                 )
 
 
