@@ -1,11 +1,15 @@
 [project]
 name = "call-me-maybe"
 version = "0.1.0"
-requires-python = ">=3.10"
+readme = "README.md"
+requires-python = ">=3.14"
 dependencies = [
-    "numpy",
+    "numpy>=2.5.0",
     "pydantic",
-    "llm-sdk",
+    "flake8",
+    "mypy",
+    "torch>=2.12.1",
+    "transformers>=5.12.1",
 ]
 
 [tool.mypy]
