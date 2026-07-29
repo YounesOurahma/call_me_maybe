@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, cast
 import numpy as np
-from llm_sdk import Small_LLM_Model
+from llm_sdk.llm_sdk import Small_LLM_Model
 from .models import FunctionDefinition
 
 _NUMBER_CHARACTERS = set("0123456789.- ")
@@ -18,8 +18,6 @@ class ParameterParser:
     """
 
     _BOOLEAN_CANDIDATES = ("true", "false")
-    _OPENERS = "([{"
-    _CLOSERS_TO_OPENERS = {")": "(", "]": "[", "}": "{"}
 
     def __init__(self, model: Small_LLM_Model) -> None:
         """Store the model and the per-run caches used for masking.
@@ -128,9 +126,7 @@ class ParameterParser:
             masked[allowed_token_ids] = logits[allowed_token_ids]
             best_allowed = int(np.argmax(masked))
 
-            inside_bracket = self._has_unclosed_bracket(value_text)
-
-            if best_overall not in allowed_set and not inside_bracket:
+            if best_overall not in allowed_set:
                 break
 
             piece = self._token_text(best_allowed)
@@ -187,20 +183,6 @@ class ParameterParser:
             self._token_cache[token_id] = cached
 
         return cached
-
-    def _has_unclosed_bracket(self, text: str) -> bool:
-        """Return True if ``text`` has an opening bracket with no match."""
-        stack: List[str] = []
-
-        for character in text:
-            if character in self._OPENERS:
-                stack.append(character)
-            elif character in self._CLOSERS_TO_OPENERS:
-                expected = self._CLOSERS_TO_OPENERS[character]
-                if stack and stack[-1] == expected:
-                    stack.pop()
-
-        return bool(stack)
 
     def default_parameters(
             self, function: FunctionDefinition) -> Dict[str, Any]:

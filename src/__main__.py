@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, cast, Tuple, List, Dict
 
-from llm_sdk import Small_LLM_Model
+from llm_sdk.llm_sdk import Small_LLM_Model
 from pydantic import ValidationError
 
 from .decoder import Decoder
