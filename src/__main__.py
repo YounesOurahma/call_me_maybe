@@ -1,3 +1,6 @@
+"""Command-line entry point for running the
+function-calling pipeline."""
+
 import argparse
 import json
 import sys
@@ -24,8 +27,7 @@ DEFAULT_OUTPUT_PATH = Path("data/output/function_calling_results.json")
 
 
 def my_parse_args() -> argparse.Namespace:
-    """Parse command-line arguments.
-    """
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--functions_definition",
@@ -47,7 +49,7 @@ def my_parse_args() -> argparse.Namespace:
 
 def error_on_duplicates(
         pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
-    """Validate the duplication of paramaters"""
+    """Validate that no duplicate parameter keys are present."""
     seen = set()
     for key, value in pairs:
         if key in seen:
@@ -57,8 +59,7 @@ def error_on_duplicates(
 
 
 def load_json(path: Path) -> List[Any]:
-    """Load a JSON array from disk.
-    """
+    """Load a JSON array from disk."""
     with path.open("r", encoding="utf-8") as file:
         return cast(
             List[Any], json.load(
@@ -67,8 +68,7 @@ def load_json(path: Path) -> List[Any]:
 
 
 def save_json(path: Path, data: List[Dict[str, Any]]) -> None:
-    """Write a list of dictionaries to disk as a JSON array.
-    """
+    """Write a list of dictionaries to disk as a JSON array."""
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with path.open("w", encoding="utf-8") as file:
@@ -80,8 +80,7 @@ def save_json(path: Path, data: List[Dict[str, Any]]) -> None:
 
 
 def _format_error(exc: ValueError) -> str:
-    """Turn an exception into a short, user-facing message.
-    """
+    """Turn an exception into a short, user-facing message."""
     if isinstance(exc, ValidationError):
         details = "\n".join(
             f"{error['msg']}"
@@ -96,8 +95,7 @@ def load_input_files(
     functions_path: Path,
     prompts_path: Path,
 ) -> Tuple[List[FunctionDefinition], List[TestPrompt]]:
-    """Load and validate both input files, failing gracefully.
-    """
+    """Load and validate both input files, failing gracefully."""
     try:
         functions_data = load_json(functions_path)
         functions = parse_function_definitions(

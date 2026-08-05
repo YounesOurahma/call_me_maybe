@@ -1,3 +1,6 @@
+"""Parameter extraction for a selected function,
+via constrained decoding."""
+
 from typing import Any, Dict, List, Optional, cast
 import numpy as np
 from llm_sdk.llm_sdk import Small_LLM_Model
@@ -14,14 +17,12 @@ _DEFAULT_VALUES: Dict[str, Any] = {
 
 
 class ParameterParser:
-    """Fills a function's parameters by continuing a JSON object.
-    """
+    """Fills a function's parameters by continuing a JSON object."""
 
     _BOOLEAN_CANDIDATES = ("true", "false")
 
     def __init__(self, model: Small_LLM_Model) -> None:
-        """Store the model and the per-run caches used for masking.
-        """
+        """Store the model and the per-run caches used for masking."""
         self._model = model
         self._token_cache: Dict[int, str] = {}
         self._number_token_ids: Optional[np.ndarray] = None
@@ -32,8 +33,8 @@ class ParameterParser:
         prompt: str,
         function: FunctionDefinition,
     ) -> Dict[str, Any]:
-        """Extract every parameter required by ``function`` from ``prompt``.
-        """
+        """Extract every parameter required by
+        ``function`` from ``prompt``."""
         context = self._build_header(prompt, function)
         parameters: Dict[str, Any] = {}
         items = list(function.parameters.items())
@@ -56,7 +57,7 @@ class ParameterParser:
             if not raw_value:
                 raise ValueError()
 
-            parameters[name] = self._convert(raw_value, param_type, name)
+            parameters[name] = self._convert(raw_value, param_type)
 
             if index < len(items) - 1:
                 context += ", "
@@ -64,9 +65,8 @@ class ParameterParser:
         return parameters
 
     def _build_header(self, prompt: str, function: FunctionDefinition) -> str:
-        """Build the single shared prompt: function, request, and the
-        literal JSON prefix the model is about to continue.
-        """
+        """Build the single shared prompt: function, request,
+        and the literal JSON prefix the model is about to continue."""
         schema = ", ".join(function.parameters.keys())
         return (
             f"Function: {function.name} - {function.description}\n"
@@ -82,16 +82,21 @@ class ParameterParser:
         return self._generate_constrained(context, allowed_ids, prompt_len)
 
     def _generate_string(self, context: str, prompt: str) -> str:
-        """Generate a string's contents (without the wrapping quotes,
-        which the caller adds) continuing ``context``."""
+        """Generate a string's contents, without the
+        wrapping quotes, continuing ``context``.
+
+        The wrapping quotes are added by the caller.
+        """
         prompt_len = len(prompt)
         allowed_ids = self._get_string_token_ids()
         return self._generate_constrained(context, allowed_ids, prompt_len)
 
     def _generate_boolean(self, context: str) -> str:
-        """Pick whichever of 'true'/'false' scores higher as the next
-        token -- with only two candidates, there's no need to mask a
-        full vocabulary; just compare their two logits directly."""
+        """Pick whichever of 'true'/'false' scores higher as the next token.
+
+        With only two candidates, there's no need to mask a full
+        vocabulary; just compare their two logits directly.
+        """
         prompt_ids = self._model.encode(context)[0].tolist()
         logits = self._model.get_logits_from_input_ids(prompt_ids)
 
@@ -107,9 +112,10 @@ class ParameterParser:
         allowed_token_ids: np.ndarray,
         max_tokens: int
     ) -> str:
-        """Greedily generate a value continuing ``context``, one token
-        at a time, taking the highest-scoring token that is allowed for
-        this type.
+        """Greedily generate a value continuing
+        ``context``, one token at a time.
+
+        Takes the highest-scoring token that is allowed for this type.
         """
         value_text = ""
         allowed_set = set(int(i) for i in allowed_token_ids)
@@ -139,8 +145,11 @@ class ParameterParser:
         return value_text.strip().strip(';')
 
     def _get_number_token_ids(self) -> np.ndarray:
-        """Return (building and caching, on first use) every token id
-        whose decoded text is made entirely of digits/'.'/'-'/space."""
+        """Return every token id whose decoded text is made entirely of
+        digits/'.'/'-'/space.
+
+        Built and cached on first use.
+        """
         if self._number_token_ids is None:
             self._number_token_ids = self._build_allowed_ids(
                 lambda text: all(ch in _NUMBER_CHARACTERS for ch in text),
@@ -148,8 +157,11 @@ class ParameterParser:
         return self._number_token_ids
 
     def _get_string_token_ids(self) -> np.ndarray:
-        """Return (building and caching, on first use) every token id
-        whose decoded text contains no newline or quote character."""
+        """Return every token id whose decoded text contains
+        no newline or quote character.
+
+        Built and cached on first use.
+        """
         if self._string_token_ids is None:
             self._string_token_ids = self._build_allowed_ids(
                 lambda text: "\n" not in text and '"' not in text,
@@ -157,9 +169,8 @@ class ParameterParser:
         return self._string_token_ids
 
     def _build_allowed_ids(self, text_is_allowed: Any) -> np.ndarray:
-        """Scan the vocabulary once and return every token id whose
-        decoded text satisfies ``text_is_allowed``.
-        """
+        """Scan the vocabulary once and return every
+        token id whose decoded text satisfies ``text_is_allowed``."""
         vocab_size = len(
             self._model.get_logits_from_input_ids(
                 self._model.encode(" ")[0].tolist(),
@@ -186,23 +197,19 @@ class ParameterParser:
 
     def default_parameters(
             self, function: FunctionDefinition) -> Dict[str, Any]:
-        """Type-correct placeholder parameters for every parameter of
-        ``function``, with no attempt at extraction.
-        """
+        """Return type-correct placeholder parameters
+        for every parameter of ``function``, with no attempt at extraction."""
         return {
             name: _DEFAULT_VALUES[definition.type]
             for name, definition in function.parameters.items()
         }
 
-    def _convert(self, raw_value: str, param_type: str, name: str) -> Any:
+    def _convert(self, raw_value: str, param_type: str) -> Any:
         """Convert the generated text into the correctly typed value."""
-        try:
-            if param_type == "boolean":
-                return raw_value == "true"
-            if param_type == "integer":
-                return int(float(raw_value.replace(" ", "")))
-            if param_type == "number":
-                return float(raw_value.replace(" ", ""))
-            return raw_value.strip()
-        except ValueError:
-            raise ValueError()
+        if param_type == "boolean":
+            return raw_value == "true"
+        if param_type == "integer":
+            return int(float(raw_value.replace(" ", "")))
+        if param_type == "number":
+            return float(raw_value.replace(" ", ""))
+        return raw_value.strip()

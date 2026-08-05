@@ -1,3 +1,6 @@
+"""Pydantic models for function definitions,
+test prompts, and function calls."""
+
 from typing import Any, Dict, List, Literal
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -11,16 +14,14 @@ _FUNCTION_DEFINITION_REQUIRED_KEYS = {
 
 
 class ParameterDef(BaseModel):
-    """Represents the declared type of a single parameter or return value.
-    """
+    """Represents the declared type of a single parameter or return value."""
 
     type: Literal["string", "number", "boolean", "integer"]
     model_config = ConfigDict(extra="forbid")
 
 
 class FunctionDefinition(BaseModel):
-    """Represents a single function the system is allowed to call.
-    """
+    """Represents a single function the system is allowed to call."""
 
     name: str
     description: str
@@ -32,9 +33,10 @@ class FunctionDefinition(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def check_required_keys(cls, data: Any) -> Any:
-        """Reject anything that isn't a JSON object with exactly the
-        four required keys, before pydantic even tries to coerce
-        individual fields.
+        """Reject anything that isn't a JSON object
+        with exactly the four required keys.
+
+        This runs before pydantic even tries to coerce individual fields.
         """
         if not isinstance(data, dict):
             raise ValueError(
@@ -63,7 +65,7 @@ class FunctionDefinition(BaseModel):
     @field_validator("name")
     @classmethod
     def name_must_not_be_empty(cls, value: str) -> str:
-        """Checks if the name is empty."""
+        """Check if the name is empty."""
         if not value.strip():
             raise ValueError("Function 'name' must not be empty.")
         return value
@@ -71,14 +73,14 @@ class FunctionDefinition(BaseModel):
     @field_validator("description")
     @classmethod
     def description_must_not_be_empty(cls, value: str) -> str:
-        """Checks if the description is empty."""
+        """Check if the description is empty."""
         if not value.strip():
             raise ValueError("Function 'description' must not be empty.")
         return value
 
     @model_validator(mode="after")
     def check_parameters(self) -> "FunctionDefinition":
-        """Every declared parameter must have a non-empty name."""
+        """Ensure every declared parameter has a non-empty name."""
         for parameter_name in self.parameters:
             if not parameter_name.strip():
                 raise ValueError(
@@ -98,14 +100,15 @@ class TestPrompt(BaseModel):
     @field_validator("prompt")
     @classmethod
     def prompt_must_not_be_empty(cls, value: str) -> str:
-        """Checks if the prompt is empty."""
+        """Check if the prompt is empty."""
         if not value.strip():
             raise ValueError("'prompt' must not be empty.")
         return value
 
 
 class FunctionCall(BaseModel):
-    """Represents the strict format the final generated output must follow."""
+    """Represents the strict format the final
+    generated output must follow."""
 
     prompt: str
     name: str
@@ -114,8 +117,8 @@ class FunctionCall(BaseModel):
 
 def parse_function_definitions(
         data: Any, source: str) -> List[FunctionDefinition]:
-    """Validate and build every ``FunctionDefinition`` found in ``data``.
-    """
+    """Validate and build every ``FunctionDefinition``
+    found in ``data``."""
     if not isinstance(data, list):
         raise ValueError(
             f"{source} must contain a JSON array of function definitions."
@@ -136,8 +139,7 @@ def parse_function_definitions(
 
 
 def parse_test_prompts(data: Any, source: str) -> List[TestPrompt]:
-    """Validate and build every ``TestPrompt`` found in ``data``.
-    """
+    """Validate and build every ``TestPrompt`` found in ``data``."""
     if not isinstance(data, list):
         raise ValueError(f"{source} must contain a JSON array of prompts.")
 
